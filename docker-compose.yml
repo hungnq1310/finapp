@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Financial News API Backend
+  finapp-api:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017
+      - DATABASE_NAME=financial_news
+      - WINDMILL_BASE_URL=http://windmill:8000
+      - LOG_LEVEL=INFO
+    depends_on:
+      - mongo
+    networks:
+      - finapp-network
+    restart: unless-stopped
+
+  # MongoDB Database
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=financial_news
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - finapp-network
+    restart: unless-stopped
+
+  # Windmill (Workflow Engine)
+  windmill:
+    image: ghcr.io/windmill-labs/windmill:main
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://windmill:password@postgres:5432/windmill
+      - BASE_URL=http://localhost:8000
+    depends_on:
+      - postgres
+    networks:
+      - finapp-network
+    restart: unless-stopped
+
+  # PostgreSQL for Windmill
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=windmill
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=windmill
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - finapp-network
+    restart: unless-stopped
+
+networks:
+  finapp-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  postgres_data:
