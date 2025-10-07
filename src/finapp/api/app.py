@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from finapp.api.routes import router
+from finapp.api.routes.v1 import router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
