@@ -40,10 +40,8 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize crawler service with config
         crawler_service = VietstockCrawlerService(
-            base_url=Config.CRAWLER_BASE_URL,
             base_dir="data",  # Unified data directory
             source_name="vietstock",  # Unified source name
-            db_path=Config.CRAWLER_DB_PATH
         )
         logger.info(f"Crawler service initialized - storing in {crawler_service.storage.output_dir}")
         

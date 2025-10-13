@@ -20,8 +20,31 @@ class StorageService:
     def __init__(self, base_dir: str = "data", source_name: str = "vietstock", db_path: str = "vietstock_crawler.db"):
         self.base_dir = base_dir
         self.source_name = source_name
+        
+        # Handle database path carefully to avoid double joining
+        if os.path.isabs(db_path):
+            self.db_path = db_path
+        elif db_path.startswith(base_dir + os.sep):
+            # db_path already includes base_dir, use as-is
+            self.db_path = db_path
+        elif db_path.startswith(base_dir):
+            # db_path starts with base_dir but may not have separator
+            self.db_path = db_path
+        else:
+            # db_path is relative to base_dir, join them
+            self.db_path = os.path.join(base_dir, db_path)
+        
+        # Set output_dir first
         self.output_dir = os.path.join(base_dir, source_name)
-        self.db_path = db_path
+        
+        # Ensure directories exist before initialization
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Only create parent directory for database if it's not in the root base_dir
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and db_dir != base_dir:
+            os.makedirs(db_dir, exist_ok=True)
+        
         self._init_database()
         self._create_output_structure()
     
@@ -68,6 +91,17 @@ class StorageService:
             os.makedirs(self.output_dir)
             logger.info(f"✅ Created output directory: {self.output_dir}")
     
+    def get_daily_folder_path(self) -> str:
+        """Get daily folder path for storing articles"""
+        date_str = datetime.now().strftime("%Y%m%d")
+        daily_dir = os.path.join(self.output_dir, date_str)
+        
+        if not os.path.exists(daily_dir):
+            os.makedirs(daily_dir, exist_ok=True)
+            logger.info(f"✅ Created daily directory: {daily_dir}")
+        
+        return daily_dir
+    
     def is_article_exists(self, guid: str) -> bool:
         """Check if article already exists in database"""
         try:
@@ -105,39 +139,68 @@ class StorageService:
             return False
     
     def save_articles_to_file(self, articles: List[Article], category_name: str = "") -> bool:
-        """Save articles to unified JSON file - only append new articles"""
+        """Save articles to daily JSON file - append to existing data"""
         if not articles:
             return False
         
         try:
-            # Get current unified file or create new one
             current_file = self.get_current_articles_file()
             
-            # Simply append new articles - don't load existing data for performance
-            # Database already handles duplicates, so we trust the input
-            new_articles_data = [article.to_dict() for article in articles]
-            
-            logger.info(f"💾 Appending {len(new_articles_data)} new articles to file")
-            
-            # For now, use simple append strategy - create file with only new articles
-            # In a production system, you might want a more sophisticated append-only strategy
-            data = {
+            # Load existing data if file exists
+            existing_data = {
                 'source': self.source_name,
                 'created_at': datetime.now().isoformat(),
                 'last_updated': datetime.now().isoformat(),
-                'total_articles': len(new_articles_data),
-                'articles': new_articles_data
+                'total_articles': 0,
+                'articles': []
             }
             
+            if os.path.exists(current_file):
+                try:
+                    with open(current_file, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not load existing file {current_file}: {e}")
+            
+            # Add new articles
+            new_articles_data = [article.to_dict() for article in articles]
+            existing_articles = existing_data.get('articles', [])
+            
+            # Combine existing and new articles
+            all_articles = existing_articles + new_articles_data
+            
+            # Remove duplicates by GUID
+            seen_guids = set()
+            unique_articles = []
+            for article in all_articles:
+                guid = article.get('guid')
+                if guid and guid not in seen_guids:
+                    seen_guids.add(guid)
+                    unique_articles.append(article)
+            
+            # Sort by crawled_at (newest first)
+            unique_articles.sort(key=lambda x: x.get('crawled_at', ''), reverse=True)
+            
+            # Update data
+            data = {
+                'source': self.source_name,
+                'created_at': existing_data.get('created_at', datetime.now().isoformat()),
+                'last_updated': datetime.now().isoformat(),
+                'total_articles': len(unique_articles),
+                'articles': unique_articles
+            }
+            
+            # Save to daily file
             with open(current_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            # Also save as latest.json
+            # Also save as latest.json (in root output dir)
             latest_file = os.path.join(self.output_dir, "latest.json")
             with open(latest_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"💾 Saved {len(articles)} new articles to unified file")
+            logger.info(f"💾 Saved {len(new_articles_data)} new articles to {current_file}")
+            logger.info(f"📊 Total articles in daily file: {len(unique_articles)}")
             return True
             
         except Exception as e:
@@ -145,24 +208,11 @@ class StorageService:
             return False
     
     def get_current_articles_file(self) -> str:
-        """Get current unified articles file path"""
-        # Check if there's an existing file for today
-        date_str = datetime.now().strftime("%Y%m%d")
-        today_file = os.path.join(self.output_dir, f"articles_{date_str}.json")
-        
-        if os.path.exists(today_file):
-            return today_file
-        
-        # Look for the most recent file
-        if os.path.exists(self.output_dir):
-            files = [f for f in os.listdir(self.output_dir) if f.startswith("articles_") and f.endswith(".json")]
-            if files:
-                files.sort(reverse=True)
-                recent_file = os.path.join(self.output_dir, files[0])
-                return recent_file
-        
-        # Create new file for today
-        return today_file
+        """Get current daily articles file path"""
+        daily_dir = self.get_daily_folder_path()
+        date_str = daily_dir.split('/')[-1]
+        articles_file = os.path.join(daily_dir, f"articles_{date_str}.json")
+        return articles_file
     
     def archive_current_file(self):
         """Archive current file with timestamp and create new one"""
@@ -199,11 +249,20 @@ class StorageService:
     def save_crawl_summary(self, session: CrawlSession):
         """Save crawl session summary"""
         try:
-            summary_file = os.path.join(self.output_dir, "summary.json")
+            # Save daily summary
+            daily_dir = self.get_daily_folder_path()
+            date_str = daily_dir.split('/')[-1]
+            summary_file = os.path.join(daily_dir, f"summary_{date_str}.json")
             with open(summary_file, 'w', encoding='utf-8') as f:
                 json.dump(session.to_dict(), f, ensure_ascii=False, indent=2)
             
-            logger.info(f"📊 Summary saved to: {summary_file}")
+            # Also save as latest summary
+            latest_file = os.path.join(self.output_dir, "summary.json")
+            with open(latest_file, 'w', encoding='utf-8') as f:
+                json.dump(session.to_dict(), f, ensure_ascii=False, indent=2)
+            
+            logger.info(f"📊 Daily summary saved to: {summary_file}")
+            logger.info(f"📊 Latest summary saved to: {latest_file}")
         except Exception as e:
             logger.error(f"❌ Error saving summary: {e}")
     

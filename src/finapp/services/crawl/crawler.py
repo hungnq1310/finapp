@@ -4,6 +4,7 @@ Vietstock Crawler Service
 
 import time
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 
@@ -17,17 +18,31 @@ logger = logging.getLogger(__name__)
 class VietstockCrawlerService:
     """Main crawler service for Vietstock RSS feeds"""
     
-    def __init__(self, base_url: str = "https://vietstock.vn/rss", 
-                 base_dir: str = "data", source_name: str = "vietstock",
-                 db_path: str = "vietstock_crawler.db"):
-        self.base_url = base_url
-        self.base_domain = "https://vietstock.vn"
+    def __init__(self, base_url: str = None, base_dir: str = "data", 
+                 source_name: str = "vietstock", db_path: str = None):
+        # Use config values if parameters not provided
+        try:
+            from ...config import Config
+            self.base_url = base_url or Config.CRAWLER_BASE_URL
+            self.base_domain = Config.CRAWLER_BASE_DOMAIN
+            db_path = db_path or Config.CRAWLER_DB_PATH
+        except ImportError:
+            # Fallback to default values if config not available
+            self.base_url = base_url or "https://vietstock.vn/rss"
+            self.base_domain = "https://vietstock.vn"
+            db_path = db_path or "data/vietstock_crawler.db"
         
         # Initialize services
         self.parser = RSSParser(self.base_domain)
-        self.storage = StorageService(base_dir, source_name, db_path)
+        
+        # If db_path is already absolute or contains base_dir, don't add base_dir again
+        if db_path and (os.path.isabs(db_path) or db_path.startswith(base_dir)):
+            self.storage = StorageService(base_dir, source_name, db_path)
+        else:
+            self.storage = StorageService(base_dir, source_name, os.path.join(base_dir, db_path))
         
         logger.info(f"✅ VietstockCrawlerService initialized - storing in {self.storage.output_dir}")
+        logger.info(f"🔗 Base RSS URL: {self.base_url}")
     
     def crawl_category(self, category: RSSCategory, filter_by_today: bool = True) -> int:
         """
@@ -64,9 +79,9 @@ class VietstockCrawlerService:
             
             # Crawl subcategories
             for subcat in category.subcategories:
-                subcat_name = f"{category_name}/{subcat.name}"
                 try:
-                    subcat_articles = self.parser.parse_rss_feed(subcat.url, subcat_name, filter_by_today)
+                    # Use main category as the category name for subcategories
+                    subcat_articles = self.parser.parse_rss_feed(subcat.url, category_name, filter_by_today)
                     new_subcat_articles = []
                     
                     # Filter new articles (parser already filtered by date)
@@ -77,13 +92,13 @@ class VietstockCrawlerService:
                             new_subcat_articles.append(article)
                     
                     if new_subcat_articles:
-                        self.storage.save_articles_to_file(new_subcat_articles, subcat_name)
+                        self.storage.save_articles_to_file(new_subcat_articles, category_name)
                     
                     time.sleep(0.5)  # Rate limiting
                     
                 except Exception as e:
-                    logger.error(f"❌ Error crawling subcategory {subcat_name}: {e}")
-                    self.storage.log_crawl_session(subcat_name, 0, False, str(e))
+                    logger.error(f"❌ Error crawling subcategory {subcat.name}: {e}")
+                    self.storage.log_crawl_session(category_name, 0, False, str(e))
             
             total_new = len(new_articles)
             self.storage.log_crawl_session(category_name, total_new, True)
