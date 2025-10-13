@@ -101,27 +101,27 @@ class RSSParser:
             rss_lists = soup.find_all('div', class_='list_item_rss')
             
             for rss_list in rss_lists:
-                # Find all main category links
-                main_links = rss_list.find_all('a', href=True)
+                # Find all list items that contain main categories
+                list_items = rss_list.find_all('li')
                 
-                for link in main_links:
-                    href = link.get('href')
-                    if href and '.rss' in href:
-                        category_text = link.get_text(strip=True)
-                        if category_text:
-                            # Build correct RSS URL
-                            full_url = urljoin(self.base_domain, str(href))
-                            
-                            # Get subcategories if any
-                            subcategories = []
-                            
-                            # Look for the next ul with margin-left-20 class
-                            current_element = link
-                            for _ in range(3):  # Look ahead a few elements
-                                current_element = current_element.find_next(['ul', 'div'])
-                                if current_element and (current_element.get('class') and 
-                                                     'margin-left-20' in current_element.get('class', [])):
-                                    sub_links = current_element.find_all('a', href=True)
+                for li in list_items:
+                    # Check if this li contains a main category (direct a tag with .rss)
+                    main_link = li.find('a', href=True)
+                    if main_link:
+                        href = main_link.get('href')
+                        if href and '.rss' in href:
+                            category_text = main_link.get_text(strip=True)
+                            if category_text:
+                                # Build correct RSS URL
+                                full_url = urljoin(self.base_domain, str(href))
+                                
+                                # Get subcategories if any
+                                subcategories = []
+                                
+                                # Look for subcategories in the nested ul with margin-left-20
+                                sub_ul = li.find('ul', class_='margin-left-20')
+                                if sub_ul:
+                                    sub_links = sub_ul.find_all('a', href=True)
                                     for sub_link in sub_links:
                                         sub_href = sub_link.get('href')
                                         if sub_href and '.rss' in sub_href:
@@ -132,14 +132,22 @@ class RSSParser:
                                                     name=sub_text,
                                                     url=sub_full_url
                                                 ))
-                                    break
-                            
-                            categories.append(RSSCategory(
-                                name=category_text,
-                                url=full_url,
-                                subcategories=subcategories
-                            ))
+                                
+                                categories.append(RSSCategory(
+                                    name=category_text,
+                                    url=full_url,
+                                    subcategories=subcategories
+                                ))
             
+            # Remove duplicates by URL
+            seen_urls = set()
+            unique_categories = []
+            for cat in categories:
+                if cat.url not in seen_urls:
+                    seen_urls.add(cat.url)
+                    unique_categories.append(cat)
+            
+            categories = unique_categories
             logger.info(f"✅ Found {len(categories)} main categories")
             
             # Debug: Print first few categories

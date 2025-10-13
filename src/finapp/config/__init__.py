@@ -34,6 +34,11 @@ class Config:
     
     # Request timeout
     CRAWLER_REQUEST_TIMEOUT = int(os.getenv("CRAWLER_REQUEST_TIMEOUT", "30"))
+    
+    # HTML Content Extraction
+    CRAWLER_EXTRACT_HTML = os.getenv("CRAWLER_EXTRACT_HTML", "false").lower() == "true"
+    CRAWLER_HTML_EXTRACTION_DELAY = float(os.getenv("CRAWLER_HTML_EXTRACTION_DELAY", "2.0"))
+    CRAWLER_HTML_BATCH_SIZE = int(os.getenv("CRAWLER_HTML_BATCH_SIZE", "10"))
 
 __all__ = [
     "Config",

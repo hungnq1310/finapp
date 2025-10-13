@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any
 import logging
 
 from ...services.crawl import VietstockCrawlerService, CrawlerScheduler
+from ...config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ class SchedulerStatusResponse(BaseModel):
 async def start_crawler(
     background_tasks: BackgroundTasks,
     auto_schedule: bool = Query(True, description="Start with auto-scheduling"),
-    interval_minutes: int = Query(5, ge=1, le=1440, description="Crawl interval in minutes")
+    interval_minutes: int = Query(5, ge=1, le=1440, description="Crawl interval in minutes"),
+    extract_html: bool = Query(Config.CRAWLER_EXTRACT_HTML, description="Extract HTML content for articles"),
+    filter_by_today: bool = Query(True, description="Only crawl articles from today")
 ):
     """
     Start the crawler service
@@ -72,6 +75,8 @@ async def start_crawler(
         background_tasks: FastAPI background tasks
         auto_schedule: Whether to start with auto-scheduling
         interval_minutes: Crawl interval in minutes
+        extract_html: Whether to extract HTML content for articles
+        filter_by_today: Whether to only crawl articles from today
         
     Returns:
         Starting result
@@ -88,16 +93,21 @@ async def start_crawler(
             
             return CrawlerResponse(
                 success=True,
-                message=f"Crawler started with auto-scheduling every {interval_minutes} minutes",
+                message=f"Crawler started with auto-scheduling every {interval_minutes} minutes{' with HTML extraction' if extract_html else ''}",
                 data={
                     "auto_schedule": True,
                     "interval_minutes": interval_minutes,
+                    "extract_html": extract_html,
+                    "filter_by_today": filter_by_today,
                     "output_directory": crawler.storage.output_dir
                 }
             )
         else:
             # Run single crawl in background
-            background_tasks.add_task(crawler.crawl_all_categories)
+            if extract_html:
+                background_tasks.add_task(crawler.crawl_with_html_extraction, filter_by_today, extract_html)
+            else:
+                background_tasks.add_task(crawler.crawl_all_categories, filter_by_today)
             
             return CrawlerResponse(
                 success=True,
@@ -286,6 +296,41 @@ async def get_crawler_config():
     except Exception as e:
         logger.error(f"Failed to get configuration: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get configuration: {e}")
+
+
+@router.post("/extract-html", response_model=CrawlerResponse)
+async def extract_html_content(
+    background_tasks: BackgroundTasks,
+    date_filter: Optional[str] = Query(None, description="Date filter in YYYYMMDD format (default: today)")
+):
+    """
+    Extract HTML content for existing articles
+    
+    Args:
+        background_tasks: FastAPI background tasks
+        date_filter: Specific date to extract HTML for (YYYYMMDD format)
+        
+    Returns:
+        HTML extraction result
+    """
+    try:
+        crawler = get_crawler_service()
+        
+        # Run HTML extraction in background
+        background_tasks.add_task(crawler.extract_html_for_existing_articles, date_filter)
+        
+        return CrawlerResponse(
+            success=True,
+            message=f"HTML extraction job started for date: {date_filter or 'today'}",
+            data={
+                "date_filter": date_filter,
+                "output_directory": crawler.storage.output_dir
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to start HTML extraction: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start HTML extraction: {e}")
 
 
 __all__ = ["router"]
