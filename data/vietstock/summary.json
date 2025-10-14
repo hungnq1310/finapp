@@ -1,0 +1,244 @@
+{
+  "crawled_at": "2025-10-10T15:51:01.723088",
+  "source": "vietstock.vn",
+  "base_url": "https://vietstock.vn/rss",
+  "output_directory": "data/vietstock",
+  "categories": [
+    {
+      "name": "Vàng và kim loại quý/Thuế và Ngân sách",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:52:48.817696"
+    },
+    {
+      "name": "Vĩ mô/Xe - Công nghệ",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:50:10.769759"
+    },
+    {
+      "name": "Làm chủ đồng tiền/Phân tích kỹ thuật",
+      "article_count": 16,
+      "latest_crawl": "2025-10-10T15:47:05.355076"
+    },
+    {
+      "name": "Làm chủ đồng tiền/Phân tích cơ bản",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:47:04.500310"
+    },
+    {
+      "name": "Làm chủ đồng tiền/Nhận định thị trường",
+      "article_count": 7,
+      "latest_crawl": "2025-10-10T15:47:03.732980"
+    },
+    {
+      "name": "Vĩ mô/Vì cộng đồng",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:41.963296"
+    },
+    {
+      "name": "Vĩ mô/Tiêu dùng và lối sống",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:41.178203"
+    },
+    {
+      "name": "Vĩ mô/Chơi sang",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:38.229175"
+    },
+    {
+      "name": "Vĩ mô/Doanh nhân và khởi nghiệp",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:46:37.433371"
+    },
+    {
+      "name": "Vĩ mô/Đầu tư – Kinh doanh nhỏ",
+      "article_count": 16,
+      "latest_crawl": "2025-10-10T15:46:36.646674"
+    },
+    {
+      "name": "Vĩ mô/Làm chủ đồng tiền",
+      "article_count": 18,
+      "latest_crawl": "2025-10-10T15:46:35.875556"
+    },
+    {
+      "name": "Chứng khoán thế giới/Kinh tế - Đầu tư",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:20.179578"
+    },
+    {
+      "name": "Chứng khoán thế giới/Thị trường chứng khoán",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:19.359907"
+    },
+    {
+      "name": "Chứng khoán thế giới/Tài chính - Ngân hàng",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:18.500121"
+    },
+    {
+      "name": "Chứng khoán thế giới/Vĩ mô",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:17.719116"
+    },
+    {
+      "name": "Vĩ mô/Kinh tế - Đầu tư",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:46:11.390209"
+    },
+    {
+      "name": "Vĩ mô/Tài chính quốc tế",
+      "article_count": 5,
+      "latest_crawl": "2025-10-10T15:46:10.623525"
+    },
+    {
+      "name": "Vĩ mô/Tiền kỹ thuật số",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:46:09.838479"
+    },
+    {
+      "name": "Vĩ mô/Chứng khoán thế giới",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:46:09.055531"
+    },
+    {
+      "name": "Ngân hàng/Kinh tế - Đầu tư",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:58.829326"
+    },
+    {
+      "name": "Ngân hàng/Vĩ mô",
+      "article_count": 18,
+      "latest_crawl": "2025-10-10T15:45:58.053843"
+    },
+    {
+      "name": "Vàng và kim loại quý/Tài sản số",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:43.306364"
+    },
+    {
+      "name": "Vàng và kim loại quý/Bảo hiểm",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:41.756936"
+    },
+    {
+      "name": "Vàng và kim loại quý/Ngân hàng",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:45:40.972842"
+    },
+    {
+      "name": "Thị trường nhà đất/Nông sản thực phẩm",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:26.105602"
+    },
+    {
+      "name": "Thị trường nhà đất/Kim loại",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:25.190393"
+    },
+    {
+      "name": "Thị trường nhà đất/Nhiên liệu",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:24.332970"
+    },
+    {
+      "name": "Thị trường nhà đất/Vàng và kim loại quý",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:45:23.537559"
+    },
+    {
+      "name": "Hoạt động kinh doanh/Bảo hiểm và thuế nhà đất",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:59.635168"
+    },
+    {
+      "name": "Hoạt động kinh doanh/Dự án",
+      "article_count": 16,
+      "latest_crawl": "2025-10-10T15:44:58.868075"
+    },
+    {
+      "name": "Hoạt động kinh doanh/Thị trường nhà đất",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:57.377808"
+    },
+    {
+      "name": "Trái phiếu",
+      "article_count": 10,
+      "latest_crawl": "2025-10-10T15:44:51.064350"
+    },
+    {
+      "name": "Chính sách",
+      "article_count": 18,
+      "latest_crawl": "2025-10-10T15:44:45.256626"
+    },
+    {
+      "name": "Câu chuyện đầu tư",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:39.427722"
+    },
+    {
+      "name": "Ý kiến chuyên gia",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:33.491109"
+    },
+    {
+      "name": "Chứng quyền",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:27.618191"
+    },
+    {
+      "name": "Chứng khoán phái sinh",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:21.370325"
+    },
+    {
+      "name": "ETF và các quỹ",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:44:15.600916"
+    },
+    {
+      "name": "Niêm yết",
+      "article_count": 18,
+      "latest_crawl": "2025-10-10T15:44:09.691352"
+    },
+    {
+      "name": "Giao dịch nội bộ",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:03.666645"
+    },
+    {
+      "name": "Cổ phiếu/Trái phiếu doanh nghiệp",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:01.319691"
+    },
+    {
+      "name": "Cổ phiếu/Nhân vật",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:44:00.569679"
+    },
+    {
+      "name": "Cổ phiếu/IPO - Cổ phần hóa",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:43:59.797842"
+    },
+    {
+      "name": "Cổ phiếu/Tăng vốn - M&A",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:43:58.764544"
+    },
+    {
+      "name": "Cổ phiếu/Cổ tức",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:43:57.997827"
+    },
+    {
+      "name": "Cổ phiếu/Hoạt động kinh doanh",
+      "article_count": 19,
+      "latest_crawl": "2025-10-10T15:43:57.239578"
+    },
+    {
+      "name": "Cổ phiếu",
+      "article_count": 20,
+      "latest_crawl": "2025-10-10T15:43:55.443548"
+    }
+  ],
+  "total_articles": 0
+}
