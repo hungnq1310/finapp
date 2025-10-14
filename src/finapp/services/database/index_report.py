@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 import logging
-import datetime
+from datetime import datetime
 from finapp.services.abstract import DatabaseService
 from finapp.database.minio import MinioDataRepository
 
