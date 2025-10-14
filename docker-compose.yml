@@ -30,16 +30,18 @@ services:
       - finapp-network
     restart: unless-stopped
 
-  # Windmill (Workflow Engine)
-  windmill:
-    image: ghcr.io/windmill-labs/windmill:main
-    ports:
-      - "8000:8000"
+  # minio
+  minio:
+    image: minio/minio
+    command: server /data
     environment:
-      - DATABASE_URL=postgresql://windmill:password@postgres:5432/windmill
-      - BASE_URL=http://localhost:8000
-    depends_on:
-      - postgres
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
     networks:
       - finapp-network
     restart: unless-stopped
