@@ -1,13 +1,15 @@
 """
-Vietstock Crawler Service
+Vietstock Crawler Service with MongoDB Backend
+
+This service replaces the SQLite-based crawler with MongoDB storage
+while maintaining full compatibility with the existing API.
 """
 
 import time
 import logging
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-from typing import List, Dict, Any
+from datetime import datetime, timezone, timedelta, date
+from typing import Optional, List, Dict, Any
 
 from .models import Article, RSSCategory, CrawlSession
 from .parser import RSSParser
@@ -17,40 +19,41 @@ logger = logging.getLogger(__name__)
 
 
 class VietstockCrawlerService:
-    """Main crawler service for Vietstock RSS feeds"""
+    """Vietstock crawler service with MongoDB backend"""
     
     def __init__(self, base_url: str = None, base_dir: str = "data", 
-                 source_name: str = "vietstock", db_path: str = None):
+                 source_name: str = "vietstock", mongo_uri: str = None, 
+                 database_name: str = None):
         # Use config values if parameters not provided
         try:
             from ...config import Config
             self.base_url = base_url or Config.CRAWLER_BASE_URL
             self.base_domain = Config.CRAWLER_BASE_DOMAIN
-            db_path = db_path or Config.CRAWLER_DB_PATH
             self.html_extraction_delay = Config.CRAWLER_HTML_EXTRACTION_DELAY
             self.html_batch_size = Config.CRAWLER_HTML_BATCH_SIZE
         except ImportError:
             # Fallback to default values if config not available
             self.base_url = base_url or "https://vietstock.vn/rss"
             self.base_domain = "https://vietstock.vn"
-            db_path = db_path or "data/vietstock_crawler.db"
             self.html_extraction_delay = 2.0
             self.html_batch_size = 10
         
         # Initialize services
         self.parser = RSSParser(self.base_domain)
-        
-        # If db_path is already absolute or contains base_dir, don't add base_dir again
-        if db_path and (os.path.isabs(db_path) or db_path.startswith(base_dir)):
-            self.storage = StorageService(base_dir, source_name, db_path)
-        else:
-            self.storage = StorageService(base_dir, source_name, os.path.join(base_dir, db_path))
+        self.storage = StorageService(
+            base_dir=base_dir,
+            source_name=source_name,
+            mongo_uri=mongo_uri,
+            database_name=database_name
+        )
         
         # HTML extractor will be initialized on demand
         self.html_extractor = None
         
-        logger.info(f"✅ VietstockCrawlerService initialized - storing in {self.storage.output_dir}")
+        logger.info(f"✅ VietstockMongoCrawlerService initialized")
         logger.info(f"🔗 Base RSS URL: {self.base_url}")
+        logger.info(f"🗄️ MongoDB Database: {self.storage.database_name}")
+        logger.info(f"📁 Export Directory: {self.storage.output_dir}")
         logger.info("🌐 HTML content extractor ready (lazy initialization)")
     
     def _get_html_extractor(self):
@@ -85,51 +88,48 @@ class VietstockCrawlerService:
         try:
             # Crawl main category (parser handles date filtering now)
             articles = self.parser.parse_rss_feed(category_url, category_name, filter_by_today)
+            # Filter new articles using MongoDB storage
             new_articles = []
-            
-            # Filter new articles (parser already filtered by date)
             for article in articles:
-                # Check if article already exists
+                # Check if article already exists in MongoDB
                 if not self.storage.is_article_exists(article.guid):
-                    self.storage.save_article_to_db(article)
                     new_articles.append(article)
             
-            # Save new articles to file
+            # Save new articles to MongoDB and file in one batch
             if new_articles:
                 self.storage.save_articles_to_file(new_articles, category_name)
+                logger.info(f"✅ Saved {len(new_articles)} new articles from {category_name}")
             
             # Crawl subcategories
             for subcat in category.subcategories:
                 try:
                     # Use main category as the category name for subcategories
                     subcat_articles = self.parser.parse_rss_feed(subcat.url, category_name, filter_by_today)
-                    new_subcat_articles = []
                     
-                    # Filter new articles (parser already filtered by date)
+                    # Filter new articles using MongoDB storage
+                    new_subcat_articles = []
                     for article in subcat_articles:
-                        # Check if article already exists
+                        # Check if article already exists in MongoDB
                         if not self.storage.is_article_exists(article.guid):
-                            self.storage.save_article_to_db(article)
                             new_subcat_articles.append(article)
                     
                     if new_subcat_articles:
                         self.storage.save_articles_to_file(new_subcat_articles, category_name)
+                        logger.info(f"✅ Saved {len(new_subcat_articles)} new articles from {subcat.name}")
                     
                     time.sleep(0.5)  # Rate limiting
                     
                 except Exception as e:
                     logger.error(f"❌ Error crawling subcategory {subcat.name}: {e}")
-                    self.storage.log_crawl_session(category_name, 0, False, str(e))
             
             total_new = len(new_articles)
-            self.storage.log_crawl_session(category_name, total_new, True)
+            logger.info(f"📊 Category {category_name}: {total_new} new articles")
             
             time.sleep(1)  # Rate limiting between main categories
             return total_new
             
         except Exception as e:
             logger.error(f"❌ Error crawling category {category_name}: {e}")
-            self.storage.log_crawl_session(category_name, 0, False, str(e))
             return 0
     
     def extract_html_for_articles(self, articles: List[Article], extract_delay: Optional[float] = None) -> Dict[str, Any]:
@@ -165,6 +165,8 @@ class VietstockCrawlerService:
                     
                     if extraction_result.get('extraction_success', False):
                         successful_count += 1
+                        # Update article in MongoDB with HTML content
+                        self.storage.save_article_to_db(article)
                     else:
                         failed_count += 1
             
@@ -207,177 +209,52 @@ class VietstockCrawlerService:
             logger.info(f"🌐 Starting HTML extraction for {session.total_articles} articles")
             
             try:
-                # Get all articles from current daily file
-                current_file = self.storage.get_current_articles_file()
-                if os.path.exists(current_file):
-                    import json
-                    with open(current_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    
-                    # Convert dict back to Article objects
-                    articles = []
-                    for article_dict in data.get('articles', []):
+                # Get recent articles from MongoDB
+                today = date.today()
+                
+                # Find articles from today
+                start_date = datetime.combine(today, datetime.min.time())
+                end_date = datetime.combine(today, datetime.max.time())
+                
+                recent_articles_dicts = self.storage.repository.find_articles_by_date_range(
+                    start_date, end_date
+                )
+                
+                # Convert dicts back to Article objects (simplified conversion)
+                articles = []
+                for article_dict in recent_articles_dicts[:50]:  # Limit to 50 for performance
+                    if isinstance(article_dict, dict):
+                        content = article_dict.get('content', {})
                         article = Article(
-                            title=article_dict.get('title', ''),
-                            link=article_dict.get('link', ''),
-                            description=article_dict.get('description', ''),
-                            pub_date=article_dict.get('pub_date', ''),
-                            guid=article_dict.get('guid', ''),
-                            category=article_dict.get('category', ''),
-                            source=article_dict.get('source', 'vietstock'),
-                            crawled_at=article_dict.get('crawled_at', ''),
-                            image=article_dict.get('image'),
-                            description_text=article_dict.get('description_text', '')
+                            title=content.get('headline', ''),
+                            link=article_dict.get('source', {}).get('url', ''),
+                            description=content.get('summary', ''),
+                            pub_date=content.get('rss_pub_date', ''),
+                            guid=content.get('rss_guid', ''),
+                            category=article_dict.get('rss_category', ''),
+                            source=article_dict.get('source', {}).get('name', 'vietstock'),
+                            crawled_at=article_dict.get('created_at', ''),
+                            image=content.get('image_url'),
+                            description_text=content.get('description_text', '')
                         )
-                        articles.append(article)
-                    
-                    if articles:
-                        # Extract HTML content
-                        extraction_results = self.extract_html_for_articles(articles)
                         
-                        # Save updated articles with HTML content
-                        if extraction_results['successful_extractions'] > 0:
-                            self.storage.save_articles_to_file(articles, "html_extraction")
-                            logger.info(f"💾 Saved {len(articles)} articles with HTML content")
-                            
-                            # Update session with extraction info
-                            session.html_extraction_results = extraction_results
+                        # Skip if HTML already extracted
+                        if not content.get('html_extraction_success', False):
+                            articles.append(article)
+                
+                if articles:
+                    # Extract HTML content
+                    extraction_results = self.extract_html_for_articles(articles)
+                    
+                    # Update session with extraction info
+                    session.html_extraction_results = extraction_results
+                    logger.info(f"🌐 HTML extraction completed: {extraction_results}")
                 
             except Exception as e:
                 logger.error(f"❌ Error during HTML extraction phase: {e}")
                 session.html_extraction_error = str(e)
         
         return session
-    
-    def extract_html_for_existing_articles(self, date_filter: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Extract HTML content for existing articles from a specific date
-        
-        Args:
-            date_filter: Date in YYYYMMDD format (default: today)
-            
-        Returns:
-            Extraction results summary
-        """
-        try:
-            # Determine date
-            if date_filter:
-                target_date = date_filter
-            else:
-                target_date = datetime.now().strftime("%Y%m%d")
-            
-            logger.info(f"🌐 Starting HTML extraction for existing articles from {target_date}")
-            
-            # Get articles file for the date
-            daily_dir = os.path.join(self.storage.output_dir, target_date)
-            articles_file = os.path.join(daily_dir, f"articles_{target_date}.json")
-            
-            if not os.path.exists(articles_file):
-                logger.warning(f"⚠️ Articles file not found: {articles_file}")
-                return {
-                    'success': False,
-                    'message': f'Articles file not found for date {target_date}',
-                    'file_path': articles_file
-                }
-            
-            # Load existing articles
-            import json
-            with open(articles_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            articles_dict = data.get('articles', [])
-            if not articles_dict:
-                logger.info(f"📄 No articles found for date {target_date}")
-                return {
-                    'success': True,
-                    'message': f'No articles found for date {target_date}',
-                    'total_articles': 0
-                }
-            
-            # Convert to Article objects
-            articles = []
-            for article_dict in articles_dict:
-                # Skip if HTML already extracted
-                if article_dict.get('html_extraction_success', False):
-                    logger.debug(f"⏭️ Skipping already extracted: {article_dict.get('title', 'Unknown')}")
-                    continue
-                
-                article = Article(
-                    title=article_dict.get('title', ''),
-                    link=article_dict.get('link', ''),
-                    description=article_dict.get('description', ''),
-                    pub_date=article_dict.get('pub_date', ''),
-                    guid=article_dict.get('guid', ''),
-                    category=article_dict.get('category', ''),
-                    source=article_dict.get('source', 'vietstock'),
-                    crawled_at=article_dict.get('crawled_at', ''),
-                    image=article_dict.get('image'),
-                    description_text=article_dict.get('description_text', '')
-                )
-                articles.append(article)
-            
-            if not articles:
-                logger.info(f"📄 All articles already have HTML content for date {target_date}")
-                return {
-                    'success': True,
-                    'message': f'All articles already have HTML content for date {target_date}',
-                    'total_articles': len(articles_dict),
-                    'already_extracted': len(articles_dict)
-                }
-            
-            logger.info(f"📊 Found {len(articles)} articles without HTML content")
-            
-            # Extract HTML content
-            extraction_results = self.extract_html_for_articles(articles)
-            
-            # Update the original articles dict with HTML content
-            updated_articles = []
-            for original_article in articles_dict:
-                # Find matching article in extraction results
-                for article in articles:
-                    if article.guid == original_article.get('guid'):
-                        # Update with HTML content
-                        updated_dict = original_article.copy()
-                        updated_dict.update(article.to_dict())
-                        updated_articles.append(updated_dict)
-                        break
-                else:
-                    # Keep original if no match
-                    updated_articles.append(original_article)
-            
-            # Save updated articles back to file
-            updated_data = {
-                'source': data.get('source', 'vietstock'),
-                'created_at': data.get('created_at', datetime.now().isoformat()),
-                'last_updated': datetime.now().isoformat(),
-                'total_articles': len(updated_articles),
-                'articles': updated_articles
-            }
-            
-            with open(articles_file, 'w', encoding='utf-8') as f:
-                json.dump(updated_data, f, ensure_ascii=False, indent=2)
-            
-            logger.info(f"💾 Updated {len(updated_articles)} articles with HTML content")
-            
-            return {
-                'success': True,
-                'message': f'HTML extraction completed for date {target_date}',
-                'date': target_date,
-                'total_articles': len(articles_dict),
-                'processed_articles': len(articles),
-                'successful_extractions': extraction_results['successful_extractions'],
-                'failed_extractions': extraction_results['failed_extractions'],
-                'extraction_time': extraction_results.get('extraction_time', 0),
-                'file_path': articles_file
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Error extracting HTML for existing articles: {e}")
-            return {
-                'success': False,
-                'message': f'Error extracting HTML: {str(e)}',
-                'date': date_filter or 'today'
-            }
     
     def crawl_all_categories(self, filter_by_today: bool = True) -> CrawlSession:
         """
@@ -427,74 +304,74 @@ class VietstockCrawlerService:
             session.categories = categories_data
             session.total_articles = total_articles
             
-            # Get detailed summary
+            # Get detailed summary from MongoDB
             summary_categories = self.storage.get_categories_summary()
-            session.categories = summary_categories
+            if summary_categories:
+                session.categories = summary_categories
             
-            # Save summary
+            # Save summary to MongoDB and file
             self.storage.save_crawl_summary(session)
             
-            logger.info(f"Crawl session completed. Total new articles: {total_articles}")
+            logger.info(f"🎉 Crawl session completed. Total new articles: {total_articles}")
             
         except Exception as e:
-            logger.error(f"Crawl session failed: {e}")
+            logger.error(f"❌ Crawl session failed: {e}")
             session.total_articles = 0
         
         return session
     
     def get_crawl_statistics(self) -> Dict[str, Any]:
-        """Get crawling statistics"""
+        """Get comprehensive crawling statistics from MongoDB"""
         try:
-            import sqlite3
-            conn = sqlite3.connect(self.storage.db_path)
-            cursor = conn.cursor()
+            # Get statistics from MongoDB repository
+            mongo_stats = self.storage.get_articles_statistics()
             
-            # Get total articles from DB
-            cursor.execute("SELECT COUNT(*) FROM articles")
-            total_articles_db = cursor.fetchone()[0]
-            
-            # Get recent crawl logs
-            cursor.execute("""
-                SELECT category, articles_count, crawl_time, success, error_message 
-                FROM crawl_log 
-                ORDER BY crawl_time DESC 
-                LIMIT 10
-            """)
-            recent_logs = cursor.fetchall()
-            
-            conn.close()
-            
-            # Get articles statistics from unified file
-            articles_stats = self.storage.get_articles_statistics()
+            # Get recent crawl sessions
+            recent_sessions = self.storage.repository.get_recent_crawl_sessions(10)
             
             return {
-                'total_articles_db': total_articles_db,
-                'total_articles_file': articles_stats.get('total_articles', 0),
-                'output_directory': self.storage.output_dir,
+                'storage_backend': 'mongodb',
+                'database_name': self.storage.database_name,
+                'mongo_statistics': mongo_stats,
+                'export_directory': self.storage.output_dir,
                 'source': self.storage.source_name,
-                'recent_logs': [
+                'recent_crawl_sessions': [
                     {
-                        'category': log[0],
-                        'articles_count': log[1],
-                        'crawl_time': log[2],
-                        'success': log[3],
-                        'error_message': log[4]
+                        'id': session.get('_id'),
+                        'created_at': session.get('created_at'),
+                        'total_articles_found': session.get('total_articles_found'),
+                        'new_articles_saved': session.get('new_articles_saved'),
+                        'success_rate': session.get('success_rate'),
+                        'duration_seconds': session.get('duration_seconds'),
+                        'success': session.get('success')
                     }
-                    for log in recent_logs
+                    for session in recent_sessions if isinstance(session, dict)
                 ],
-                'categories_summary': self.storage.get_categories_summary(),
-                'articles_statistics': articles_stats
+                'last_updated': datetime.utcnow().isoformat()
             }
             
         except Exception as e:
-            logger.error(f" Error getting statistics: {e}")
+            logger.error(f"❌ Error getting statistics: {e}")
             return {
-                'total_articles_db': 0,
-                'total_articles_file': 0,
-                'output_directory': self.storage.output_dir,
-                'source': self.storage.source_name,
-                'recent_logs': [],
-                'categories_summary': [],
-                'articles_statistics': {},
-                'error': str(e)
+                'storage_backend': 'mongodb',
+                'database_name': self.storage.database_name,
+                'error': str(e),
+                'last_updated': datetime.utcnow().isoformat()
             }
+    
+    def close(self):
+        """Close crawler and cleanup resources"""
+        try:
+            if self.storage:
+                self.storage.close()
+            logger.info("🔌 VietstockMongoCrawlerService closed")
+        except Exception as e:
+            logger.error(f"❌ Error closing crawler service: {e}")
+    
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        self.close()

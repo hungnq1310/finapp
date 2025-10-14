@@ -21,6 +21,8 @@ class CrawlerScheduler:
         self.interval_minutes = interval_minutes
         self.scheduler = BackgroundScheduler()
         self.is_running = False
+        self.extract_html = False  # Default to no HTML extraction
+        self.filter_by_today = True  # Default to filter by today
         
         # Register cleanup on exit
         atexit.register(self.shutdown)
@@ -83,7 +85,7 @@ class CrawlerScheduler:
         if self.is_running:
             self.stop()
     
-    def trigger_manual_crawl(self):
+    def trigger_manual_crawl(self, filter_by_today: bool = True, extract_html: bool = False):
         """Trigger a manual crawl job"""
         if not self.is_running:
             logger.warning("⚠️ Scheduler is not running. Start the scheduler first.")
@@ -92,7 +94,8 @@ class CrawlerScheduler:
         try:
             logger.info("🔄 Triggering manual crawl")
             self.scheduler.add_job(
-                func=self._crawl_job,
+                func=self._crawl_job_with_params,
+                args=[filter_by_today, extract_html],
                 trigger='date',
                 id='manual_crawl',
                 name='Manual Vietstock Crawl'
@@ -102,6 +105,23 @@ class CrawlerScheduler:
         except Exception as e:
             logger.error(f"❌ Failed to trigger manual crawl: {e}")
             return False
+    
+    def _crawl_job_with_params(self, filter_by_today: bool = True, extract_html: bool = False):
+        """Internal crawl job method with parameters"""
+        try:
+            logger.info(f"🚀 Starting manual crawl session (filter_today={filter_by_today}, extract_html={extract_html})")
+            if extract_html:
+                session = self.crawler_service.crawl_with_html_extraction(filter_by_today, extract_html)
+            else:
+                session = self.crawler_service.crawl_all_categories(filter_by_today)
+            
+            if session.total_articles > 0:
+                logger.info(f"✅ Manual crawl completed. New articles: {session.total_articles}")
+            else:
+                logger.info("ℹ️ Manual crawl completed. No new articles found")
+                
+        except Exception as e:
+            logger.error(f"❌ Manual crawl failed: {e}")
     
     def get_next_run_time(self) -> Optional[str]:
         """Get next scheduled run time"""
@@ -130,8 +150,11 @@ class CrawlerScheduler:
     def _crawl_job(self):
         """Internal crawl job method"""
         try:
-            logger.info("🚀 Starting scheduled crawl session")
-            session = self.crawler_service.crawl_all_categories()
+            logger.info(f"🚀 Starting scheduled crawl session (filter_today={self.filter_by_today}, extract_html={self.extract_html})")
+            if self.extract_html:
+                session = self.crawler_service.crawl_with_html_extraction(self.filter_by_today, self.extract_html)
+            else:
+                session = self.crawler_service.crawl_all_categories(self.filter_by_today)
             
             if session.total_articles > 0:
                 logger.info(f"✅ Scheduled crawl completed. New articles: {session.total_articles}")

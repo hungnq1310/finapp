@@ -1,149 +1,203 @@
 """
-Storage service for Vietstock crawler
+MongoDB Storage service for Vietstock crawler
+
+This service replaces the SQLite-based storage with MongoDB repository
+while maintaining compatibility with the existing crawler logic.
 """
 
 import os
 import json
-import sqlite3
-from datetime import datetime
-from typing import List, Optional, Dict, Any
 import logging
+from datetime import datetime, timezone
+from typing import List, Optional, Dict, Any
+import uuid
 
 from .models import Article, CrawlSession, RSSCategory
+from ...database.vietstock import VietstockRepository
+from ...schema.vietstock import VietstockArticle, VietstockSource, VietstockContent, VietstockCrawlSession
 
 logger = logging.getLogger(__name__)
 
 
 class StorageService:
-    """Service for managing data storage (JSON files and SQLite tracking)"""
+    """Service for managing data storage using MongoDB"""
     
-    def __init__(self, base_dir: str = "data", source_name: str = "vietstock", db_path: str = "vietstock_crawler.db"):
+    def __init__(self, base_dir: str = "data", source_name: str = "vietstock", 
+                 mongo_uri: str = None, database_name: str = "financial_news"):
         self.base_dir = base_dir
         self.source_name = source_name
+        self.mongo_uri = mongo_uri or os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+        self.database_name = database_name or os.getenv("DATABASE_NAME", "financial_news")
         
-        # Handle database path carefully to avoid double joining
-        if os.path.isabs(db_path):
-            self.db_path = db_path
-        elif db_path.startswith(base_dir + os.sep):
-            # db_path already includes base_dir, use as-is
-            self.db_path = db_path
-        elif db_path.startswith(base_dir):
-            # db_path starts with base_dir but may not have separator
-            self.db_path = db_path
-        else:
-            # db_path is relative to base_dir, join them
-            self.db_path = os.path.join(base_dir, db_path)
+        # Initialize MongoDB repository
+        self.repository = VietstockRepository(self.mongo_uri, self.database_name)
         
-        # Set output_dir first
+        # Set output directory for JSON exports (keeping for compatibility)
         self.output_dir = os.path.join(base_dir, source_name)
+        os.makedirs(self.output_dir, exist_ok=True)
         
-        # Ensure directories exist before initialization
-        os.makedirs(base_dir, exist_ok=True)
-        
-        # Only create parent directory for database if it's not in the root base_dir
-        db_dir = os.path.dirname(self.db_path)
-        if db_dir and db_dir != base_dir:
-            os.makedirs(db_dir, exist_ok=True)
-        
-        self._init_database()
-        self._create_output_structure()
-    
-    def _init_database(self):
-        """Initialize SQLite database for tracking crawled articles"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS articles (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    guid TEXT UNIQUE NOT NULL,
-                    title TEXT,
-                    link TEXT,
-                    pub_date TEXT,
-                    category TEXT,
-                    crawled_at TEXT
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS crawl_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category TEXT,
-                    articles_count INTEGER,
-                    crawl_time TEXT,
-                    success BOOLEAN,
-                    error_message TEXT
-                )
-            ''')
-            
-            conn.commit()
-            conn.close()
-            logger.info("✅ Database initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
-            raise
-    
-    def _create_output_structure(self):
-        """Create output directory structure"""
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-            logger.info(f"✅ Created output directory: {self.output_dir}")
-    
-    def get_daily_folder_path(self) -> str:
-        """Get daily folder path for storing articles"""
-        date_str = datetime.now().strftime("%Y%m%d")
-        daily_dir = os.path.join(self.output_dir, date_str)
-        
-        if not os.path.exists(daily_dir):
-            os.makedirs(daily_dir, exist_ok=True)
-            logger.info(f"✅ Created daily directory: {daily_dir}")
-        
-        return daily_dir
+        logger.info(f"✅ MongoDB Storage service initialized with database: {self.database_name}")
     
     def is_article_exists(self, guid: str) -> bool:
-        """Check if article already exists in database"""
+        """Check if article already exists in MongoDB"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM articles WHERE guid = ?", (guid,))
-            result = cursor.fetchone()
-            conn.close()
-            return result is not None
+            article = self.repository.find_article_by_guid(guid)
+            return article is not None
         except Exception as e:
             logger.error(f"❌ Error checking article existence: {e}")
             return False
     
     def save_article_to_db(self, article: Article) -> bool:
-        """Save article to database"""
+        """Save article to MongoDB using Vietstock schema"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR IGNORE INTO articles (guid, title, link, pub_date, category, crawled_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                article.guid,
-                article.title,
-                article.link,
-                article.pub_date,
-                article.category,
-                article.crawled_at
-            ))
-            conn.commit()
-            conn.close()
-            return True
+            # Check if article already exists in MongoDB
+            existing_article = self.repository.find_article_by_guid(article.guid)
+            
+            if existing_article:
+                # Update existing article with HTML content only
+                success = self._update_article_html_content(existing_article, article)
+                if success:
+                    logger.debug(f"✅ Updated HTML content for existing article: {article.guid}")
+                return success
+            else:
+                # Convert Article model to VietstockArticle (new article)
+                vietstock_article = self._convert_to_vietstock_article(article)
+                
+                # Save to MongoDB
+                success = self.repository.save_article(vietstock_article)
+                
+                if success:
+                    logger.debug(f"✅ Created new article in MongoDB: {article.guid}")
+                
+                return success
+            
         except Exception as e:
-            logger.error(f"❌ Error saving article to DB: {e}")
+            logger.error(f"❌ Error saving article to MongoDB: {e}")
             return False
     
+    def _update_article_html_content(self, existing_doc: Dict, new_article: Article) -> bool:
+        """Update only HTML content fields for an existing article"""
+        try:
+            # Preserve the existing _id
+            existing_id = existing_doc.get('_id')
+            
+            # Update HTML content fields in the existing document
+            updates = {
+                'content.html_extracted_at': datetime.fromisoformat(str(new_article.html_extracted_at)) if new_article.html_extracted_at else None,
+                'content.html_extraction_success': new_article.html_extraction_success,
+                'content.raw_html': new_article.raw_html,
+                'content.main_content': new_article.main_content,
+                'content.content_hash': new_article.content_hash,
+                'last_updated': datetime.now()
+            }
+            
+            # Update in MongoDB using the existing _id
+            collection = self.repository.db.vietstock_articles
+            result = collection.update_one(
+                {'_id': existing_id},
+                {'$set': updates}
+            )
+            
+            # Also update JSON file with HTML content
+            if result.modified_count > 0:
+                self._update_html_in_json_file(new_article)
+            
+            return result.modified_count > 0
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating HTML content for article {new_article.guid}: {e}")
+            return False
+    
+    def _update_html_in_json_file(self, article: Article) -> bool:
+        """Update HTML content for an article in the JSON file"""
+        try:
+            # Get current articles file
+            current_file = self.get_current_articles_file()
+            
+            if not os.path.exists(current_file):
+                logger.warning(f"⚠️ JSON file {current_file} does not exist, cannot update HTML content")
+                return False
+            
+            # Load existing data
+            with open(current_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Find and update the article by GUID
+            article_found = False
+            for json_article in data.get('articles', []):
+                if json_article.get('guid') == article.guid:
+                    # Update HTML fields
+                    json_article['raw_html'] = article.raw_html
+                    json_article['main_content'] = article.main_content
+                    json_article['content_hash'] = article.content_hash
+                    json_article['html_extracted_at'] = article.html_extracted_at.isoformat() if article.html_extracted_at and hasattr(article.html_extracted_at, 'isoformat') else article.html_extracted_at
+                    json_article['html_extraction_success'] = article.html_extraction_success
+                    article_found = True
+                    break
+            
+            if article_found:
+                # Update the file
+                data['last_updated'] = datetime.now().isoformat()
+                with open(current_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                # Also update latest.json
+                latest_file = os.path.join(self.output_dir, "latest.json")
+                with open(latest_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                logger.debug(f"✅ Updated HTML content in JSON file for article: {article.guid}")
+                return True
+            else:
+                logger.warning(f"⚠️ Article {article.guid} not found in JSON file for HTML update")
+                return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating HTML content in JSON file for article {article.guid}: {e}")
+            return False
+    
+    def save_articles_batch(self, articles: List[Article]) -> Dict[str, int]:
+        """Save multiple articles to MongoDB in batch"""
+        if not articles:
+            return {"success": 0, "failed": 0, "duplicates": 0}
+        
+        try:
+            # Convert all articles to VietstockArticle format
+            vietstock_articles = []
+            for article in articles:
+                try:
+                    vietstock_article = self._convert_to_vietstock_article(article)
+                    vietstock_articles.append(vietstock_article)
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to convert article {article.guid}: {e}")
+            
+            # Save batch to MongoDB
+            results = self.repository.save_articles_batch(vietstock_articles)
+            
+            logger.info(f"📊 Batch save to MongoDB: {results}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Error in batch save to MongoDB: {e}")
+            return {"success": 0, "failed": len(articles), "duplicates": 0}
+    
     def save_articles_to_file(self, articles: List[Article], category_name: str = "") -> bool:
-        """Save articles to daily JSON file - append to existing data"""
+        """
+        Save articles to JSON file (keeping for compatibility and export purposes)
+        This method now serves as an export/backup function
+        """
         if not articles:
             return False
         
         try:
+            # Save to MongoDB first
+            batch_results = self.save_articles_batch(articles)
+            
+            # Ensure JSON file exists (restore from MongoDB if missing)
+            if not self.ensure_json_file_exists():
+                logger.warning("⚠️ Could not ensure JSON file exists, proceeding with new articles only")
+            
+            # Export to JSON file (keeping existing structure for compatibility)
             current_file = self.get_current_articles_file()
             
             # Load existing data if file exists
@@ -162,7 +216,7 @@ class StorageService:
                 except Exception as e:
                     logger.warning(f"⚠️ Could not load existing file {current_file}: {e}")
             
-            # Add new articles
+            # Add new articles data
             new_articles_data = [article.to_dict() for article in articles]
             existing_articles = existing_data.get('articles', [])
             
@@ -187,6 +241,7 @@ class StorageService:
                 'created_at': existing_data.get('created_at', datetime.now().isoformat()),
                 'last_updated': datetime.now().isoformat(),
                 'total_articles': len(unique_articles),
+                'mongo_sync_stats': batch_results,
                 'articles': unique_articles
             }
             
@@ -199,8 +254,8 @@ class StorageService:
             with open(latest_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"💾 Saved {len(new_articles_data)} new articles to {current_file}")
-            logger.info(f"📊 Total articles in daily file: {len(unique_articles)}")
+            logger.info(f"💾 Exported {len(new_articles_data)} articles to {current_file}")
+            logger.info(f"📊 MongoDB sync stats: {batch_results}")
             return True
             
         except Exception as e:
@@ -209,177 +264,333 @@ class StorageService:
     
     def get_current_articles_file(self) -> str:
         """Get current daily articles file path"""
-        daily_dir = self.get_daily_folder_path()
-        date_str = daily_dir.split('/')[-1]
+        date_str = datetime.now().strftime("%Y%m%d")
+        daily_dir = os.path.join(self.output_dir, date_str)
+        os.makedirs(daily_dir, exist_ok=True)
+        
         articles_file = os.path.join(daily_dir, f"articles_{date_str}.json")
         return articles_file
     
-    def archive_current_file(self):
-        """Archive current file with timestamp and create new one"""
+    def restore_from_mongodb(self, date_filter: Optional[str] = None) -> bool:
+        """
+        Restore JSON files from MongoDB when they are missing
+        
+        Args:
+            date_filter: Specific date in YYYYMMDD format (default: today)
+            
+        Returns:
+            True if restoration was successful
+        """
         try:
-            current_file = self.get_current_articles_file()
-            if os.path.exists(current_file):
-                # Create archive filename with timestamp
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                archive_file = os.path.join(self.output_dir, f"archive_articles_{timestamp}.json")
-                
-                # Move current file to archive
-                import shutil
-                shutil.move(current_file, archive_file)
-                
-                logger.info(f"📦 Archived current file to: {archive_file}")
-                
+            # Determine target date
+            if date_filter:
+                target_date = datetime.strptime(date_filter, "%Y%m%d").date()
+            else:
+                target_date = datetime.now().date()
+            
+            # Get date range for the target date
+            start_date = datetime.combine(target_date, datetime.min.time())
+            end_date = datetime.combine(target_date, datetime.max.time())
+            
+            # Fetch articles from MongoDB for the specific date
+            articles_dicts = self.repository.find_articles_by_date_range(start_date, end_date)
+            
+            if not articles_dicts:
+                logger.info(f"ℹ️ No articles found in MongoDB for {target_date}")
+                return False
+            
+            logger.info(f"🔄 Found {len(articles_dicts)} articles in MongoDB for {target_date}")
+            
+            # Convert MongoDB documents to Article format
+            articles = []
+            for article_dict in articles_dicts:
+                try:
+                    if isinstance(article_dict, dict):
+                        content = article_dict.get('content', {})
+                        article = {
+                            "title": content.get('headline', ''),
+                            "link": article_dict.get('source', {}).get('url', ''),
+                            "description": content.get('summary', ''),
+                            "pub_date": content.get('rss_pub_date', ''),
+                            "guid": content.get('rss_guid', ''),
+                            "category": article_dict.get('rss_category', ''),
+                            "source": article_dict.get('source', {}).get('name', 'vietstock'),
+                            "crawled_at": article_dict.get('created_at', '').isoformat() if article_dict.get('created_at') else '',
+                            "image": content.get('image_url'),
+                            "description_text": content.get('description_text', ''),
+                            # HTML content fields
+                            "raw_html": content.get('raw_html'),
+                            "main_content": content.get('main_content'),
+                            "content_hash": content.get('content_hash'),
+                            "html_extracted_at": content.get('html_extracted_at').isoformat() if content.get('html_extracted_at') else None,
+                            "html_extraction_success": content.get('html_extraction_success', False)
+                        }
+                        articles.append(article)
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to convert article from MongoDB: {e}")
+            
+            if not articles:
+                logger.warning("⚠️ No valid articles could be converted from MongoDB")
+                return False
+            
+            # Save to JSON file using existing method
+            date_str = target_date.strftime("%Y%m%d")
+            daily_dir = os.path.join(self.output_dir, date_str)
+            os.makedirs(daily_dir, exist_ok=True)
+            
+            # Create JSON structure
+            data = {
+                "source": self.source_name,
+                "created_at": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat(),
+                "total_articles": len(articles),
+                "mongo_sync_stats": {
+                    "success": len(articles),
+                    "failed": 0,
+                    "duplicates": 0,
+                    "restored_from_mongodb": True
+                },
+                "articles": articles
+            }
+            
+            # Save to daily file
+            articles_file = os.path.join(daily_dir, f"articles_{date_str}.json")
+            with open(articles_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            # Also save as latest.json
+            latest_file = os.path.join(self.output_dir, "latest.json")
+            with open(latest_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            logger.info(f"✅ Restored {len(articles)} articles from MongoDB to {articles_file}")
+            return True
+            
         except Exception as e:
-            logger.error(f"❌ Error archiving file: {e}")
+            logger.error(f"❌ Error restoring from MongoDB: {e}")
+            return False
     
-    def log_crawl_session(self, category: str, count: int, success: bool, error_msg: Optional[str] = None):
-        """Log crawl session to database"""
+    def ensure_json_file_exists(self, date_filter: Optional[str] = None) -> bool:
+        """
+        Ensure JSON file exists, restore from MongoDB if missing
+        
+        Args:
+            date_filter: Specific date in YYYYMMDD format (default: today)
+            
+        Returns:
+            True if file exists or was successfully restored
+        """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO crawl_log (category, articles_count, crawl_time, success, error_message)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (category, count, datetime.now().isoformat(), success, error_msg))
-            conn.commit()
-            conn.close()
+            # Determine target date and file path
+            if date_filter:
+                target_date = datetime.strptime(date_filter, "%Y%m%d").date()
+            else:
+                target_date = datetime.now().date()
+            
+            date_str = target_date.strftime("%Y%m%d")
+            daily_dir = os.path.join(self.output_dir, date_str)
+            articles_file = os.path.join(daily_dir, f"articles_{date_str}.json")
+            
+            # Check if file already exists
+            if os.path.exists(articles_file):
+                logger.debug(f"ℹ️ JSON file already exists: {articles_file}")
+                return True
+            
+            logger.warning(f"⚠️ JSON file missing: {articles_file}")
+            
+            # Try to restore from MongoDB
+            restored = self.restore_from_mongodb(date_filter)
+            if restored:
+                logger.info(f"✅ Successfully restored JSON file from MongoDB")
+                return True
+            else:
+                logger.warning(f"⚠️ Could not restore JSON file from MongoDB")
+                return False
+                
         except Exception as e:
-            logger.error(f"❌ Error logging crawl session: {e}")
+            logger.error(f"❌ Error ensuring JSON file exists: {e}")
+            return False
     
     def save_crawl_summary(self, session: CrawlSession):
-        """Save crawl session summary"""
+        """Save crawl session summary to MongoDB and file"""
         try:
-            # Save daily summary
+            # Convert to VietstockCrawlSession and save to MongoDB
+            vietstock_session = self._convert_to_crawl_session(session)
+            self.repository.save_crawl_session(vietstock_session)
+            
+            # Also save to file for compatibility
             daily_dir = self.get_daily_folder_path()
             date_str = daily_dir.split('/')[-1]
             summary_file = os.path.join(daily_dir, f"summary_{date_str}.json")
+            
+            # Add MongoDB stats to session data
+            session_data = session.to_dict()
+            session_data['mongo_database'] = self.database_name
+            session_data['mongo_sync'] = True
+            
             with open(summary_file, 'w', encoding='utf-8') as f:
-                json.dump(session.to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(session_data, f, ensure_ascii=False, indent=2)
             
             # Also save as latest summary
             latest_file = os.path.join(self.output_dir, "summary.json")
             with open(latest_file, 'w', encoding='utf-8') as f:
-                json.dump(session.to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(session_data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"📊 Daily summary saved to: {summary_file}")
-            logger.info(f"📊 Latest summary saved to: {latest_file}")
+            logger.info(f"📊 Crawl summary saved to MongoDB and {summary_file}")
+            
         except Exception as e:
             logger.error(f"❌ Error saving summary: {e}")
     
+    def get_daily_folder_path(self) -> str:
+        """Get daily folder path for storing files"""
+        date_str = datetime.now().strftime("%Y%m%d")
+        daily_dir = os.path.join(self.output_dir, date_str)
+        os.makedirs(daily_dir, exist_ok=True)
+        return daily_dir
+    
     def get_categories_summary(self) -> List[Dict[str, Any]]:
-        """Get summary from unified articles file"""
-        categories = []
-        
+        """Get categories summary from MongoDB"""
         try:
-            current_file = self.get_current_articles_file()
-            if os.path.exists(current_file):
-                with open(current_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    articles = data.get('articles', [])
-                
-                # Count articles by category
-                category_counts = {}
-                latest_crawl_by_category = {}
-                
-                for article in articles:
-                    category = article.get('category', 'Unknown')
-                    category_counts[category] = category_counts.get(category, 0) + 1
-                    
-                    # Track latest crawl time per category
-                    crawl_time = article.get('crawled_at', '')
-                    if crawl_time and crawl_time > latest_crawl_by_category.get(category, ''):
-                        latest_crawl_by_category[category] = crawl_time
-                
-                # Convert to list format
-                for category, count in category_counts.items():
-                    categories.append({
-                        'name': category,
-                        'article_count': count,
-                        'latest_crawl': latest_crawl_by_category.get(category)
-                    })
-        
+            stats = self.repository.get_articles_statistics()
+            return stats.get('categories', [])
         except Exception as e:
             logger.error(f"❌ Error getting categories summary: {e}")
-        
-        return categories
-    
-    def reset_database(self):
-        """Reset database for testing purposes"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Clear all tables
-            cursor.execute("DELETE FROM articles")
-            cursor.execute("DELETE FROM crawl_log")
-            
-            conn.commit()
-            conn.close()
-            logger.info("🗑️ Database reset successfully")
-            
-        except Exception as e:
-            logger.error(f"❌ Error resetting database: {e}")
+            return []
     
     def get_articles_statistics(self) -> Dict[str, Any]:
-        """Get comprehensive statistics from current articles file"""
+        """Get comprehensive statistics from MongoDB"""
         try:
+            # Get MongoDB statistics
+            mongo_stats = self.repository.get_articles_statistics()
+            
+            # Add file-based statistics for compatibility
             current_file = self.get_current_articles_file()
-            if not os.path.exists(current_file):
-                return {
-                    'total_articles': 0,
-                    'source': self.source_name,
-                    'categories': [],
-                    'latest_crawl': None,
-                    'file_info': {'file_path': current_file, 'exists': False}
-                }
-            
-            with open(current_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                articles = data.get('articles', [])
-            
-            # Count by category
-            category_stats = {}
-            for article in articles:
-                category = article.get('category', 'Unknown')
-                if category not in category_stats:
-                    category_stats[category] = {
-                        'count': 0,
-                        'latest_crawl': None,
-                        'latest_title': None
-                    }
-                
-                category_stats[category]['count'] += 1
-                
-                crawl_time = article.get('crawled_at', '')
-                if crawl_time and (category_stats[category]['latest_crawl'] is None or crawl_time > category_stats[category]['latest_crawl']):
-                    category_stats[category]['latest_crawl'] = crawl_time
-                    category_stats[category]['latest_title'] = article.get('title', '')
-            
-            return {
-                'total_articles': len(articles),
-                'source': data.get('source', self.source_name),
-                'created_at': data.get('created_at'),
-                'last_updated': data.get('last_updated'),
-                'categories': [
-                    {
-                        'name': cat,
-                        'article_count': stats['count'],
-                        'latest_crawl': stats['latest_crawl'],
-                        'latest_title': stats['latest_title']
-                    }
-                    for cat, stats in category_stats.items()
-                ],
-                'file_info': {
-                    'file_path': current_file,
-                    'exists': True,
-                    'size_mb': os.path.getsize(current_file) / (1024*1024)
-                }
+            file_stats = {
+                'file_path': current_file,
+                'file_exists': os.path.exists(current_file),
+                'file_size_mb': os.path.getsize(current_file) / (1024*1024) if os.path.exists(current_file) else 0
             }
+            
+            # Combine statistics
+            combined_stats = {
+                **mongo_stats,
+                'file_stats': file_stats,
+                'storage_backend': 'mongodb',
+                'database_name': self.database_name,
+                'export_directory': self.output_dir
+            }
+            
+            return combined_stats
             
         except Exception as e:
             logger.error(f"❌ Error getting articles statistics: {e}")
             return {
-                'total_articles': 0,
-                'source': self.source_name,
-                'error': str(e)
+                'error': str(e),
+                'storage_backend': 'mongodb',
+                'database_name': self.database_name
             }
+    
+    def reset_database(self):
+        """Reset MongoDB collections for testing purposes"""
+        try:
+            # This would require implementing a reset method in the repository
+            # For now, just log the action
+            logger.warning("⚠️ MongoDB reset not implemented yet - use database management tools")
+            logger.info("🗑️ To reset MongoDB, manually drop the collections or database")
+            
+        except Exception as e:
+            logger.error(f"❌ Error resetting database: {e}")
+    
+    def _convert_to_vietstock_article(self, article: Article) -> VietstockArticle:
+        """Convert Article model to VietstockArticle schema"""
+        try:
+            # Create VietstockSource
+            source = VietstockSource(
+                url=article.link,
+                rss_url=None,  # Could be extracted from category context
+                category=article.category
+            )
+            
+            # Parse publication date
+            pub_date = datetime.now()
+            if article.pub_date:
+                try:
+                    # Try to parse RSS date format
+                    from email.utils import parsedate_to_datetime
+                    pub_date = parsedate_to_datetime(article.pub_date)
+                except:
+                    # Fallback to current time
+                    pub_date = datetime.now()
+            
+            # Create VietstockContent
+            content = VietstockContent(
+                headline=article.title,
+                summary=article.description_text or article.description,
+                body=article.main_content or article.description,
+                rss_description=article.description,
+                rss_guid=article.guid,
+                rss_pub_date=article.pub_date,
+                image_url=article.image,
+                description_text=article.description_text,
+                raw_html=article.raw_html,
+                main_content=article.main_content,
+                content_hash=article.content_hash,
+                html_extracted_at=datetime.fromisoformat(str(article.html_extracted_at)) if article.html_extracted_at else None,
+                html_extraction_success=article.html_extraction_success
+            )
+            
+            # Generate unique ID
+            article_id = str(uuid.uuid4())
+            
+            # Create VietstockArticle
+            vietstock_article = VietstockArticle(
+                id=article_id,
+                source=source,
+                content=content,
+                published_at=pub_date,
+                rss_category=article.category,
+                crawled_at=datetime.fromisoformat(str(article.crawled_at)) if article.crawled_at else datetime.now()
+            )
+            
+            return vietstock_article
+            
+        except Exception as e:
+            logger.error(f"❌ Error converting article to Vietstock schema: {e}")
+            raise
+    
+    def _convert_to_crawl_session(self, session: CrawlSession) -> VietstockCrawlSession:
+        """Convert CrawlSession to VietstockCrawlSession schema"""
+        try:
+            # Generate unique ID
+            session_id = str(uuid.uuid4())
+            
+            # Extract categories from session data
+            categories = []
+            if hasattr(session, 'categories') and session.categories:
+                categories = [cat.get('name', '') for cat in session.categories if isinstance(cat, dict)]
+            
+            # Create VietstockCrawlSession
+            vietstock_session = VietstockCrawlSession(
+                id=session_id,
+                source_base_url=getattr(session, 'base_url', ''),
+                categories_crawled=categories,
+                total_articles_found=getattr(session, 'total_articles', 0),
+                new_articles_saved=getattr(session, 'total_articles', 0),
+                html_extraction_enabled=getattr(session, 'html_extraction_enabled', False),
+                html_extraction_stats=getattr(session, 'html_extraction_results', {}),
+                success=True,
+                error_message=None,
+                created_at=datetime.fromisoformat(session.crawled_at) if session.crawled_at else datetime.now()
+            )
+            
+            return vietstock_session
+            
+        except Exception as e:
+            logger.error(f"❌ Error converting crawl session to Vietstock schema: {e}")
+            raise
+    
+    def close(self):
+        """Close MongoDB connection"""
+        if self.repository:
+            self.repository.close()
+            logger.info("🔌 MongoDB storage service closed")

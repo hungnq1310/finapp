@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
+import os
+from datetime import datetime
 
 from ...services.crawl import VietstockCrawlerService, CrawlerScheduler
 from ...config import Config
@@ -20,7 +22,7 @@ _crawler_service: Optional[VietstockCrawlerService] = None
 _scheduler: Optional[CrawlerScheduler] = None
 
 
-def get_crawler_service() -> VietstockCrawlerService:
+def get_crawler_service():
     """Get or create crawler service instance"""
     global _crawler_service
     if _crawler_service is None:
@@ -87,6 +89,8 @@ async def start_crawler(
         if auto_schedule:
             scheduler = get_scheduler()
             scheduler.interval_minutes = interval_minutes
+            scheduler.extract_html = extract_html
+            scheduler.filter_by_today = filter_by_today
             
             # Start scheduler in background
             background_tasks.add_task(scheduler.start, run_immediately=True)
@@ -282,7 +286,8 @@ async def get_crawler_config():
             "base_url": crawler.base_url,
             "base_domain": crawler.base_domain,
             "output_directory": crawler.storage.output_dir,
-            "database_path": crawler.storage.db_path,
+            "database_name": crawler.storage.database_name,
+            "storage_backend": "mongodb",
             "current_interval_minutes": scheduler.interval_minutes,
             "scheduler_running": scheduler.is_running
         }
@@ -316,8 +321,8 @@ async def extract_html_content(
     try:
         crawler = get_crawler_service()
         
-        # Run HTML extraction in background
-        background_tasks.add_task(crawler.extract_html_for_existing_articles, date_filter)
+        # Run crawl with HTML extraction
+        background_tasks.add_task(crawler.crawl_with_html_extraction, True, True)
         
         return CrawlerResponse(
             success=True,
@@ -331,6 +336,105 @@ async def extract_html_content(
     except Exception as e:
         logger.error(f"Failed to start HTML extraction: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start HTML extraction: {e}")
+
+
+@router.post("/restore-from-mongodb", response_model=CrawlerResponse)
+async def restore_json_from_mongodb(
+    date_filter: Optional[str] = Query(None, description="Date filter in YYYYMMDD format (default: today)")
+):
+    """
+    Restore JSON files from MongoDB when they are missing or corrupted
+    
+    Args:
+        date_filter: Specific date to restore (YYYYMMDD format, default: today)
+        
+    Returns:
+        Restoration result
+    """
+    try:
+        crawler = get_crawler_service()
+        
+        # Perform restoration
+        restored = crawler.storage.restore_from_mongodb(date_filter)
+        
+        if restored:
+            return CrawlerResponse(
+                success=True,
+                message=f"JSON file successfully restored from MongoDB for date: {date_filter or 'today'}",
+                data={
+                    "date_filter": date_filter,
+                    "restored": True,
+                    "output_directory": crawler.storage.output_dir
+                }
+            )
+        else:
+            return CrawlerResponse(
+                success=False,
+                message=f"Failed to restore JSON file from MongoDB for date: {date_filter or 'today'}",
+                data={
+                    "date_filter": date_filter,
+                    "restored": False,
+                    "reason": "No articles found in MongoDB or restoration failed"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"Failed to restore from MongoDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore from MongoDB: {e}")
+
+
+@router.get("/check-json-status", response_model=CrawlerResponse)
+async def check_json_file_status(
+    date_filter: Optional[str] = Query(None, description="Date filter in YYYYMMDD format (default: today)")
+):
+    """
+    Check if JSON file exists and can be restored from MongoDB
+    
+    Args:
+        date_filter: Specific date to check (YYYYMMDD format, default: today)
+        
+    Returns:
+        File status and restoration availability
+    """
+    try:
+        crawler = get_crawler_service()
+        
+        # Check if JSON file exists
+        file_exists = crawler.storage.ensure_json_file_exists(date_filter)
+        
+        # Get MongoDB stats for that date
+        if date_filter:
+            target_date = datetime.strptime(date_filter, "%Y%m%d").date()
+        else:
+            target_date = datetime.now().date()
+        
+        start_date = datetime.combine(target_date, datetime.min.time())
+        end_date = datetime.combine(target_date, datetime.max.time())
+        
+        mongo_articles = crawler.storage.repository.find_articles_by_date_range(start_date, end_date)
+        mongo_count = len(mongo_articles)
+        
+        # Determine file path
+        date_str = target_date.strftime("%Y%m%d")
+        daily_dir = os.path.join(crawler.storage.output_dir, date_str)
+        articles_file = os.path.join(daily_dir, f"articles_{date_str}.json")
+        
+        return CrawlerResponse(
+            success=True,
+            message="File status check completed",
+            data={
+                "date_filter": date_filter,
+                "file_exists": os.path.exists(articles_file),
+                "file_path": articles_file,
+                "mongo_articles_count": mongo_count,
+                "restoration_possible": mongo_count > 0,
+                "auto_restored": file_exists and mongo_count > 0
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to check JSON status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check JSON status: {e}")
 
 
 __all__ = ["router"]
