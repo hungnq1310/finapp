@@ -1,0 +1,306 @@
+summary: 'Report Chung Khoan V1  - production '
+description: 'Stock report generation with MinIO storage, retry logic, and JSON output'
+value:
+  modules:
+    - id: validate_inputs
+      summary: validated_config
+      value:
+        type: rawscript
+        content: '!inline validated_config.inline_script.py'
+        input_transforms:
+          minio_access_key:
+            type: javascript
+            expr: flow_input.minio_access_key
+          minio_bucket:
+            type: javascript
+            expr: flow_input.minio_bucket
+          minio_endpoint:
+            type: javascript
+            expr: flow_input.minio_endpoint
+          minio_secret_key:
+            type: javascript
+            expr: flow_input.minio_secret_key
+          stock_market:
+            type: javascript
+            expr: flow_input.stock_market
+        assets: []
+        lock: '!inline validated_config.inline_script.lock'
+        language: python3
+    - id: health_check
+      summary: check_api_health
+      value:
+        type: rawscript
+        content: '!inline check_api_health.inline_script.py'
+        input_transforms:
+          base_url:
+            type: javascript
+            expr: flow_input.base_url
+        assets: []
+        lock: '!inline check_api_health.inline_script.lock'
+        language: python3
+    - id: fetch_data_with_retry
+      value:
+        type: branchall
+        branches:
+          - summary: Enhanced data fetching with retry logic
+            modules:
+              - id: download_last_day_json
+                summary: Download Last Day's JSON from MinIO
+                value:
+                  type: rawscript
+                  content: '!inline download_last_day''s_json_from_minio.inline_script.py'
+                  input_transforms:
+                    minio_config:
+                      type: javascript
+                      expr: results.validate_inputs.minio_config
+                  assets: []
+                  lock: >-
+                    !inline
+                    download_last_day's_json_from_minio.inline_script.lock
+                  language: python3
+              - id: fetch_top_sectors
+                summary: fetch_sectors_data
+                value:
+                  type: rawscript
+                  content: '!inline fetch_sectors_data.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                  assets: []
+                  lock: '!inline fetch_sectors_data.inline_script.lock'
+                  language: python3
+              - id: fetch_netforeign
+                summary: fetch_netforeign_data
+                value:
+                  type: rawscript
+                  content: '!inline fetch_netforeign_data.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                  assets: []
+                  lock: '!inline fetch_netforeign_data.inline_script.lock'
+                  language: python3
+              - id: fetch_interested_stocks
+                summary: fetch_interested_stocks
+                value:
+                  type: rawscript
+                  content: '!inline fetch_interested_stocks.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                  assets: []
+                  lock: '!inline fetch_interested_stocks.inline_script.lock'
+                  language: python3
+              - id: fetch_khoi_tu_doanh
+                summary: fetch_khoi_tu_doanh
+                value:
+                  type: rawscript
+                  content: '!inline fetch_khoi_tu_doanh.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                    stock_market:
+                      type: javascript
+                      expr: results.validate_inputs.stock_market
+                  assets: []
+                  lock: '!inline fetch_khoi_tu_doanh.inline_script.lock'
+                  language: python3
+              - id: fetch_khoi_ngoai
+                summary: fetch_khoi_ngoai
+                value:
+                  type: rawscript
+                  content: '!inline fetch_khoi_ngoai.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                    stock_market:
+                      type: javascript
+                      expr: results.validate_inputs.stock_market
+                  assets: []
+                  lock: '!inline fetch_khoi_ngoai.inline_script.lock'
+                  language: python3
+              - id: fetch_index_summary
+                summary: fetch_index_summary
+                value:
+                  type: rawscript
+                  content: '!inline fetch_index_summary.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                  assets: []
+                  lock: '!inline fetch_index_summary.inline_script.lock'
+                  language: python3
+              - id: fetch_index_fluctuation
+                summary: fetch_index_fluctuation
+                value:
+                  type: rawscript
+                  content: '!inline fetch_index_fluctuation.inline_script.py'
+                  input_transforms:
+                    base_url:
+                      type: javascript
+                      expr: flow_input.base_url
+                    stock_market:
+                      type: javascript
+                      expr: results.validate_inputs.stock_market
+                  assets: []
+                  lock: '!inline fetch_index_fluctuation.inline_script.lock'
+                  language: python3
+            expr: >-
+              results.health_check.healthy ||
+              results.health_check.health_percentage >= 70
+            parallel: true
+            skip_failure: false
+          - summary: Fallback when APIs are unhealthy
+            modules:
+              - id: fallback_handler
+                value:
+                  type: rawscript
+                  content: '!inline inline_script_0.inline_script.py'
+                  input_transforms:
+                    health_status:
+                      type: javascript
+                      expr: results.health_check
+                  assets: []
+                  lock: '!inline inline_script_0.inline_script.lock'
+                  language: python3
+            expr: >-
+              !results.health_check.healthy &&
+              results.health_check.health_percentage < 70
+            parallel: false
+            skip_failure: false
+        parallel: false
+    - id: merge_and_validate_data
+      summary: merged_and_validated_data
+      value:
+        type: rawscript
+        content: '!inline merged_and_validated_data.inline_script.py'
+        input_transforms:
+          args:
+            type: javascript
+            expr: |-
+              [
+                results.fetch_index_fluctuation, 
+                results.fetch_index_summary,
+                results.fetch_khoi_ngoai,
+                results.fetch_khoi_tu_doanh,
+                results.fetch_interested_stocks,
+                results.fetch_netforeign,
+                results.fetch_top_sectors
+              ].filter(Boolean)
+          last_day_data:
+            type: javascript
+            expr: results.download_last_day_json
+        assets: []
+        lock: '!inline merged_and_validated_data.inline_script.lock'
+        language: python3
+    - id: save_to_minio
+      summary: save_to_minio_result
+      value:
+        type: rawscript
+        content: '!inline save_to_minio_result.inline_script.py'
+        input_transforms:
+          data:
+            type: javascript
+            expr: results.merge_and_validate_data
+          minio_access_key:
+            type: javascript
+            expr: results.validate_inputs.minio_config.access_key
+          minio_bucket:
+            type: javascript
+            expr: results.validate_inputs.minio_config.bucket
+          minio_endpoint:
+            type: javascript
+            expr: results.validate_inputs.minio_config.endpoint
+          minio_secret_key:
+            type: javascript
+            expr: results.validate_inputs.minio_config.secret_key
+          stock_market:
+            type: javascript
+            expr: results.validate_inputs.stock_market
+        assets: []
+        lock: '!inline save_to_minio_result.inline_script.lock'
+        language: python3
+    - id: final_status_report
+      summary: final_report
+      value:
+        type: rawscript
+        content: '!inline final_report.inline_script.py'
+        input_transforms:
+          health_check_result:
+            type: javascript
+            expr: results.health_check
+          merge_result:
+            type: javascript
+            expr: results.merge_and_validate_data
+          minio_result:
+            type: javascript
+            expr: results.save_to_minio
+          validation_result:
+            type: javascript
+            expr: results.validate_inputs
+        assets: []
+        lock: '!inline final_report.inline_script.lock'
+        language: python3
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  order:
+    - stock_market
+    - minio_endpoint
+    - minio_bucket
+    - minio_access_key
+    - minio_secret_key
+    - base_url
+  properties:
+    base_url:
+      type: string
+      description: API base URL
+      default: 'http://172.18.0.10:8000'
+      nullable: false
+    minio_access_key:
+      type: string
+      description: MinIO access key
+      nullable: false
+      placeholder: minioadmin
+    minio_bucket:
+      type: string
+      description: MinIO bucket name for storing reports
+      default: stock-reports
+      maxLength: 63
+      minLength: 3
+      nullable: false
+      pattern: '^[a-z0-9.-]+$'
+      placeholder: stock-reports
+    minio_endpoint:
+      type: string
+      description: 'MinIO endpoint URL (e.g., http://minio:9000)'
+      default: 'http://localhost:9000'
+      nullable: false
+      placeholder: 'http://minio:9000'
+    minio_secret_key:
+      type: string
+      description: MinIO secret key
+      default: ''
+      nullable: false
+    stock_market:
+      type: string
+      description: 'Stock market to analyze (HSX, HNX, or UPCOM)'
+      default: HSX
+      enum:
+        - HSX
+        - HNX
+        - UPCOM
+      nullable: false
+  required:
+    - stock_market
+    - minio_endpoint
+    - minio_bucket
+    - minio_access_key
+    - minio_secret_key
+    - base_url

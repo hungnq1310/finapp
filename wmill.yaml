@@ -1,0 +1,24 @@
+defaultTs: bun
+includes:
+  - f/finnews/**
+excludes: []
+codebases: []
+skipVariables: false
+skipResources: false
+skipResourceTypes: false
+skipSecrets: true
+skipScripts: false
+skipFlows: false
+skipApps: true
+skipFolders: false
+includeSchedules: true
+includeTriggers: true
+includeUsers: false
+includeGroups: false
+includeSettings: false
+includeKey: false
+gitBranches:
+  main:
+    overrides: {}
+    baseUrl: 'http://localhost:5555/'
+    workspaceId: finops
