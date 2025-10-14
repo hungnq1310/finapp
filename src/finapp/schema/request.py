@@ -68,3 +68,7 @@ class DatabaseResponse(BaseModel):
     message: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+class LLMExtractorResponese(BaseModel):
+    """Response model for LLM Extractor"""
+    # Fill out as needed
