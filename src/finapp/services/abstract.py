@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, Any
 
 class WorkflowOrchestrator(ABC):
     """Interface for orchestrating the complete workflow"""
     
     @abstractmethod
-    async def run_workflow(self, workspace: str, script_path: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Run the complete workflow with given parameters"""
+    async def run_workflow(self, workspace: str, script_path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Run the complete workflow with given payload"""
         pass
 
 
