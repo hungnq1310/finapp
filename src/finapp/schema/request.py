@@ -4,7 +4,7 @@ API Models for Financial News Analysis
 This module defines Pydantic models for API requests and responses.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
@@ -69,6 +69,10 @@ class DatabaseResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
-class LLMExtractorResponese(BaseModel):
-    """Response model for LLM Extractor"""
-    # Fill out as needed
+class LLMExtractorResponse(BaseModel):
+    """Response model for LLM Extractor API"""
+    success: bool = Field(..., description="Whether extraction was successful")
+    message: str = Field(..., description="Response message")
+    data: Optional[Dict[str, Any]] = Field(None, description="Response data")
+    session_id: Optional[str] = Field(None, description="Session ID for tracking")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="Response timestamp")

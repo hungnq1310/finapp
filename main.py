@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from src.finapp.api.routes import crawler_router
+from src.finapp.api.routes import crawler_router, extractor_router
 from src.finapp.services.crawl import VietstockCrawlerService, CrawlerScheduler
 from src.finapp.config import Config
 
@@ -88,8 +88,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include router
+# Include routers
 app.include_router(crawler_router)
+app.include_router(extractor_router)
 
 # Health check endpoint
 @app.get("/health")
@@ -109,7 +110,7 @@ async def health_check():
 async def root():
     """Root endpoint"""
     return {
-        "message": "Vietstock Crawler API v2.0.0",
+        "message": "Vietstock Crawler & LLM Extractor API v2.0.0",
         "docs": "/docs",
         "health": "/health",
         "crawler_endpoints": {
@@ -118,7 +119,18 @@ async def root():
             "trigger": "/crawl/trigger",
             "stats": "/crawl/stats",
             "scheduler_status": "/crawl/scheduler/status",
-            "config": "/crawl/config"
+            "config": "/crawl/config",
+            "extract_html": "/crawl/extract-html",
+            "restore_from_mongodb": "/crawl/restore-from-mongodb"
+        },
+        "extractor_endpoints": {
+            "single_article": "/extract/single",
+            "batch_articles": "/extract/batch",
+            "process_file": "/extract/process-file",
+            "upload_and_process": "/extract/upload-and-process",
+            "sessions": "/extract/sessions",
+            "model_info": "/extract/model/info",
+            "config": "/extract/config"
         }
     }
 

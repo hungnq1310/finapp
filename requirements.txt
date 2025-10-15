@@ -32,3 +32,11 @@ apscheduler>=3.10.4
 
 # Timezone handling
 pytz>=2023.3
+
+# LLM and LangChain
+langchain>=0.1.0
+langchain-openai>=0.1.0
+jinja2>=3.1.0
+
+# Additional LLM support
+openai>=1.0.0

@@ -42,6 +42,16 @@ class Config:
     CRAWLER_EXTRACT_HTML = os.getenv("CRAWLER_EXTRACT_HTML", "false").lower() == "true"
     CRAWLER_HTML_EXTRACTION_DELAY = float(os.getenv("CRAWLER_HTML_EXTRACTION_DELAY", "2.0"))
     CRAWLER_HTML_BATCH_SIZE = int(os.getenv("CRAWLER_HTML_BATCH_SIZE", "10"))
+    
+    # LLM Extractor Configuration
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "anthropic/claude-3.5-sonnet")
+    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+    LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
+    EXTRACTOR_BATCH_SIZE = int(os.getenv("EXTRACTOR_BATCH_SIZE", "5"))
+    EXTRACTOR_DELAY_SECONDS = float(os.getenv("EXTRACTOR_DELAY_SECONDS", "1.0"))
+    EXTRACTOR_OUTPUT_DIR = os.getenv("EXTRACTOR_OUTPUT_DIR", "data/extracted")
 
 __all__ = [
     "Config",
