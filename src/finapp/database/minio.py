@@ -24,9 +24,9 @@ class MinioDataRepository(DataRepository):
     def __init__(self):
         """Initialize MinIO client with configuration"""
         self.endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
-        self.access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-        self.secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
-        self.bucket_name = os.getenv("MINIO_BUCKET", "stock-reports")
+        self.access_key = os.getenv("MINIO_ACCESS_KEY", "")
+        self.secret_key = os.getenv("MINIO_SECRET_KEY", "")
+        self.bucket_name = os.getenv("MINIO_BUCKET_NAME", "")
         self.secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
         
         # Remove http:// or https:// from endpoint if present
@@ -215,7 +215,7 @@ class MinioDataRepository(DataRepository):
                 response = self.client.get_object(self.bucket_name, obj.object_name)
                 data = json.loads(response.read().decode('utf-8'))
                 result.append({
-                    "filename": obj.object_name,
+                    "object_name": obj.object_name,
                     "size": obj.size,
                     "last_modified": obj.last_modified.isoformat() if obj.last_modified else None,
                     "data": data

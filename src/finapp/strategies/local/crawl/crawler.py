@@ -26,7 +26,7 @@ class VietstockCrawlerService:
                  database_name: str = None):
         # Use config values if parameters not provided
         try:
-            from ...config import Config
+            from finapp.config import Config
             self.base_url = base_url or Config.CRAWLER_BASE_URL
             self.base_domain = Config.CRAWLER_BASE_DOMAIN
             self.html_extraction_delay = Config.CRAWLER_HTML_EXTRACTION_DELAY

@@ -13,8 +13,8 @@ from typing import List, Optional, Dict, Any
 import uuid
 
 from .models import Article, CrawlSession, RSSCategory
-from ...database.vietstock import VietstockRepository
-from ...schema.vietstock import VietstockArticle, VietstockSource, VietstockContent, VietstockCrawlSession
+from finapp.database.vietstock import VietstockRepository
+from finapp.schema.vietstock import VietstockArticle, VietstockSource, VietstockContent, VietstockCrawlSession
 
 logger = logging.getLogger(__name__)
 

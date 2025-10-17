@@ -9,8 +9,9 @@ import logging
 import os
 from datetime import datetime
 
-from ...services.crawl import VietstockCrawlerService, CrawlerScheduler
-from ...config import Config
+from finapp.strategies.local.crawl.crawler import VietstockCrawlerService
+from finapp.strategies.local.crawl.scheduler import CrawlerScheduler
+from finapp.config import Config
 
 logger = logging.getLogger(__name__)
 

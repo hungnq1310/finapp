@@ -13,8 +13,8 @@ from bs4 import BeautifulSoup
 import time
 import hashlib
 
-from ..crawl.models import Article
-from ...config import Config
+from finapp.strategies.local.crawl.models import Article
+from finapp.config import Config
 
 logger = logging.getLogger(__name__)
 

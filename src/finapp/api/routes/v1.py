@@ -197,6 +197,7 @@ async def list_index_reports(
     try:
         # Get list of reports from MinIO
         objects = minio_service.list_index_reports(limit=limit)
+        print(objects)
 
         # Transform to response format
         reports = []

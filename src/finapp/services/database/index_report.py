@@ -39,7 +39,7 @@ class MinioService(DatabaseService):
             return []
         try:
             reports = self.database.list_objects(
-                prefix=prefix or "stock_reports/",
+                prefix=prefix,
                 limit=limit
             )
         
@@ -62,13 +62,13 @@ class MinioService(DatabaseService):
             logger.error(f"Error getting index report {filename}: {e}")
             return None
 
-    def get_latest_index_report(self) -> Optional[Dict[str, Any]]:
+    def get_latest_index_report(self, prefix: str ="") -> Optional[Dict[str, Any]]:
         """Get latest index report (MinIO-specific method)"""
         if not self.database:
             logger.error("Database connection not established")
             return None
         try:
-            objects = list(self.database.list_objects(prefix="stock_reports/", limit=10))
+            objects = list(self.database.list_objects(prefix=prefix, limit=10))
             
             if not objects:
                 return None
@@ -82,14 +82,14 @@ class MinioService(DatabaseService):
             logger.error(f"Error getting latest index report: {e}")
             return None
 
-    def get_index_report_by_date(self, target_date: str) -> Optional[Dict[str, Any]]:
+    def get_index_report_by_date(self, target_date: str, prefix: str = "") -> Optional[Dict[str, Any]]:
         """Get index report by date (MinIO-specific method)"""
         if not self.database:
             logger.error("Database connection not established")
             return None
         try:
             # List objects that match the date pattern
-            objects = list(self.database.list_objects(prefix="stock_reports/", limit=100))
+            objects = list(self.database.list_objects(prefix=prefix, limit=100))
             for obj in objects:
                 if target_date in obj.get("object_name", ""):
                     report = self.database.find_by_name(obj.get("object_name", ""))
