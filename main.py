@@ -11,9 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from src.finapp.api.routes import crawler_router
-from src.finapp.services.crawl import VietstockCrawlerService, CrawlerScheduler
-from src.finapp.config import Config
+from finapp.api.routes.crawler import router as crawler_router
+from finapp.api.routes.v1 import router as v1_router
+from finapp.strategies.local.crawl.crawler import VietstockCrawlerService
+from finapp.strategies.local.crawl.scheduler import CrawlerScheduler
+from finapp.config import Config
 
 load_dotenv()
 
@@ -90,6 +92,7 @@ app.add_middleware(
 
 # Include router
 app.include_router(crawler_router)
+app.include_router(v1_router)
 
 # Health check endpoint
 @app.get("/health")
