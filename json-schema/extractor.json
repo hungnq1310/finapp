@@ -1,0 +1,183 @@
+{
+  "type": "object",
+  "properties": {
+    "sentiment_analysis": {
+      "type": "object",
+      "properties": {
+        "overall_sentiment": {
+          "type": "string",
+          "enum": ["tích cực", "tiêu cực", "trung lập"]
+        },
+        "sentiment_score": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "key_factors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["overall_sentiment", "sentiment_score"]
+    },
+    "stock_level": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Z]{2,4}$"
+          },
+          "company_name": {"type": "string"},
+          "sentiment": {
+            "type": "string",
+            "enum": ["tích cực", "tiêu cực", "trung lập"]
+          },
+          "impact_type": {
+            "type": "string",
+            "enum": ["tài chính", "hoạt động kinh doanh", "thị trường", "quản trị", "pháp lý", "khác"]
+          },
+          "price_impact": {
+            "type": "string",
+            "enum": ["tăng", "giảm", "không đổi", "chưa xác định"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": ["ticker", "sentiment", "impact_type", "confidence"]
+      }
+    },
+    "sector_level": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sector_name": {
+            "type": "string",
+            "enum": [
+              "Ngân hàng",
+              "Chứng khoán",
+              "Bất động sản",
+              "Bán lẻ",
+              "Công nghệ",
+              "Sản xuất",
+              "Năng lượng",
+              "Vật liệu xây dựng",
+              "Viễn thông",
+              "Giao thông vận tải",
+              "Hàng tiêu dùng",
+              "Dược phẩm & Y tế",
+              "Giáo dục",
+              "Nông nghiệp",
+              "Thủy sản",
+              "Khoáng sản",
+              "Hóa chất",
+              "Cơ khí",
+              "Đầu tư công",
+              "Bảo hiểm"
+            ]
+          },
+          "sentiment": {
+            "type": "string",
+            "enum": ["tích cực", "tiêu cực", "trung lập"]
+          },
+          "impact_description": {"type": "string"},
+          "affected_companies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["sector_name", "sentiment", "impact_description"]
+      }
+    },
+    "market_level": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["toàn thị trường", "ngành cụ thể", "cổ phiếu cụ thể", "chưa xác định"]
+        },
+        "exchange": {
+          "type": "string",
+          "enum": ["HOSE", "HNX", "UPCOM", "cả ba", "chưa xác định"]
+        },
+        "market_moving": {"type": "boolean"},
+        "impact_magnitude": {
+          "type": "string",
+          "enum": ["cao", "trung bình", "thấp", "không ảnh hưởng"]
+        },
+        "key_indices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["VN-Index", "HNX-Index", "UPCOM-Index", "VN30", "HNX30", "khác"]
+          }
+        }
+      },
+      "required": ["scope", "exchange", "market_moving"]
+    },
+    "financial_data": {
+      "type": "object",
+      "properties": {
+        "has_numbers": {"type": "boolean"},
+        "revenues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {"type": "number"},
+              "unit": {"type": "string"},
+              "period": {"type": "string"},
+              "context": {"type": "string"}
+            }
+          }
+        },
+        "profits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {"type": "number"},
+              "unit": {"type": "string"},
+              "period": {"type": "string"},
+              "context": {"type": "string"}
+            }
+          }
+        },
+        "percentages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {"type": "number"},
+              "metric": {"type": "string"},
+              "context": {"type": "string"}
+            }
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {"type": "number"},
+              "unit": {"type": "string"},
+              "currency": {"type": "string"},
+              "context": {"type": "string"}
+            }
+          }
+        }
+      },
+      "required": ["has_numbers"]
+    }
+  },
+  "required": ["sentiment_analysis", "stock_level", "sector_level", "market_level", "financial_data"]
+}

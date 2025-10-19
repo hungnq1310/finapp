@@ -1,0 +1,49 @@
+Bạn là chuyên gia phân tích tài chính chuyên sâu về thị trường chứng khoán Việt Nam. Hãy đọc kỹ bài báo và phân tích theo 3 mức độ sau:
+
+## NỘI DUNG BÀI BÁO:
+**Tiêu đề:** {{ title }}
+**Chuyên mục:** {{ category }}  
+**Mô tả:** {{ description_text }}
+**Nội dung đầy đủ:** {{ main_content }}
+
+## HƯỚNG DẪN PHÂN TÍCH:
+
+### CẤP 1 - PHÂN TÍCH CỔ PHIẾU (Stock Level):
+- Tìm tất cả mã cổ phiếu Việt Nam (2-4 ký tự in hoa) được nhắc đến
+- Xác định công ty tương ứng nếu có
+- Đánh giá tâm lý (tích cực/tiêu cực/trung lập) dựa trên nội dung
+- Phân loại tác động: tài chính, kinh doanh, thị trường, quản trị, pháp lý
+- Dự báo ảnh hưởng giá: tăng/giảm/không đổi
+
+### CẤP 2 - PHÂN TÍCH NGÀNH (Sector Level):
+- Xác định ngành bị ảnh hưởng (ngân hàng, chứng khoán, bất động sản, công nghệ, v.v.)
+- Đánh giá tâm lý chung của ngành
+- Mô tả tác động cụ thể lên ngành
+- Liệt kê các công ty liên quan nếu có
+
+### CẤP 3 - PHÂN TÍCH THỊ TRƯỜNG (Market Level):
+- Xác định phạm vi ảnh hưởng: toàn thị trường/ngành cụ thể/cổ phiếu cụ thể
+- Sàn chứng khoán liên quan: HOSE, HNX, UPCOM
+- Đánh giá có làm thị trường biến động không (market moving)
+- Xác định chỉ số bị ảnh hưởng: VN-Index, HNX-Index, VN30, v.v.
+
+### CẤP 4 - PHÂN TÍCH CẢM XÚC & SỐ LIỆU:
+- Đánh giá tâm lý chung bài báo (-1 đến +1)
+- Liệt kê các yếu tố chính ảnh hưởng tâm lý
+- Trích xuất số liệu tài chính (doanh thu, lợi nhuận, %)
+- Ghi lại các con số quan trọng khác
+
+## CẤU TRÚC JSON YÊU CẦU:
+```json
+{{ json_schema }}
+```
+
+**QUAN TRỌNG:**
+- Chỉ sử dụng thông tin CÓ TRONG bài báo
+- Không suy luận hay thêm thông tin ngoài bài viết
+- Điền "trung lập" hoặc rỗng nếu không có thông tin
+- Confidence score: 0.0-1.0 (độ tin cậy của phân tích)
+- Sentiment score: -1.0 (tiêu cực) đến +1.0 (tích cực)
+
+## OUTPUT:
+Chỉ trả về JSON object duy nhất, không có text giải thích.
