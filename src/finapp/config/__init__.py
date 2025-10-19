@@ -13,11 +13,40 @@ load_dotenv()
 class Config:
     """Application configuration with environment variable support"""
     
-    # Crawler Configuration
+    # Multi-Source Crawler Configuration
+    CRAWLER_SOURCES = os.getenv("CRAWLER_SOURCES", "vietstock").split(",")  # Comma-separated list
     CRAWLER_BASE_URL = os.getenv("CRAWLER_BASE_URL", "https://vietstock.vn/rss")
     CRAWLER_BASE_DOMAIN = os.getenv("CRAWLER_BASE_DOMAIN", "https://vietstock.vn")
-    CRAWLER_OUTPUT_DIR = os.getenv("CRAWLER_OUTPUT_DIR", "data/vietstock")
+    CRAWLER_OUTPUT_DIR = os.getenv("CRAWLER_OUTPUT_DIR", "data")
     CRAWLER_INTERVAL_MINUTES = int(os.getenv("CRAWLER_INTERVAL_MINUTES", "5"))
+    
+    # Source-specific configurations
+    CRAWLER_SOURCE_CONFIGS = {
+        'vietstock': {
+            'base_url': os.getenv("VIETSTOCK_BASE_URL", "https://vietstock.vn/rss"),
+            'base_domain': os.getenv("VIETSTOCK_BASE_DOMAIN", "https://vietstock.vn"),
+            'output_dir': os.getenv("VIETSTOCK_OUTPUT_DIR", "data/vietstock"),
+            'supports_categories': True,
+            'html_extraction_delay': 2.0,
+            'html_batch_size': 10
+        },
+        'cafef': {
+            'base_url': os.getenv("CAFEF_BASE_URL", "https://cafef.vn/rss"),
+            'base_domain': os.getenv("CAFEF_BASE_DOMAIN", "https://cafef.vn"),
+            'output_dir': os.getenv("CAFEF_OUTPUT_DIR", "data/cafef"),
+            'supports_categories': True,
+            'html_extraction_delay': 3.0,
+            'html_batch_size': 5
+        },
+        'vietnamfinance': {
+            'base_url': os.getenv("VIETNAMFINANCE_BASE_URL", "https://vietnamfinance.vn/rss"),
+            'base_domain': os.getenv("VIETNAMFINANCE_BASE_DOMAIN", "https://vietnamfinance.vn"),
+            'output_dir': os.getenv("VIETNAMFINANCE_OUTPUT_DIR", "data/vietnamfinance"),
+            'supports_categories': True,
+            'html_extraction_delay': 2.5,
+            'html_batch_size': 8
+        }
+    }
     
     # MongoDB Configuration
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")

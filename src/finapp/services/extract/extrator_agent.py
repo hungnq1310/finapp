@@ -160,21 +160,53 @@ class LLMExtractorAgent:
         """
         try:
             # Prepare prompt with JSON schema
-            prompt = self.prompt_template.render(
-                title=title,
-                category=category,
-                description_text=description_text,
-                main_content=main_content,
-                json_schema=json.dumps(self.json_schema, indent=2, ensure_ascii=False)
-            )
+            try:
+                prompt = self.prompt_template.render(
+                    title=title,
+                    category=category,
+                    description_text=description_text,
+                    main_content=main_content,
+                    json_schema=json.dumps(self.json_schema, indent=2, ensure_ascii=False)
+                )
+                logger.info(f"✅ Prompt rendered successfully")
+                logger.info(f"📝 Rendered prompt sample (first 200 chars): {prompt[:200]}...")
+                
+                # Verify template variables are replaced
+                if '{title}' in prompt or '{main_content}' in prompt:
+                    logger.error("❌ TEMPLATE VARIABLES NOT RENDERED - Found literal {title} or {main_content} in prompt!")
+                    logger.error(f"❌ Prompt contains unrendered variables - this is the bug!")
+                else:
+                    logger.info("✅ Template variables properly rendered - no literal {title} or {main_content} found")
+            except Exception as e:
+                logger.error(f"❌ Template rendering failed: {e}")
+                # Fallback: create prompt manually
+                prompt = f"""Đọc bài báo sau và trả về JSON theo đúng cấu trúc.
+
+## NỘI DUNG BÀI BÁO:
+**Tiêu đề:** {title}
+**Chuyên mục:** {category}  
+**Mô tả:** {description_text}
+**Nội dung:** {main_content}
+
+## YÊU CẦU TRÍCH XUẤT:
+1. **Tìm mã cổ phiếu**: Các mã cổ phiếu của Việt Nam được nhắc đến trong bài báo
+2. **Tìm ngành**: Các ngành như ngân hàng, công nghệ, bất động sản
+3. **Tìm số liệu**: Các con số trong bài báo
+
+## OUTPUT JSON:
+{json.dumps(self.json_schema, indent=2, ensure_ascii=False)}
+
+Chỉ trả về JSON object."""
+                logger.warning(f"⚠️ Using fallback prompt due to template rendering error")
             
             logger.info(f"🔄 Extracting data for article: {article_guid}")
             logger.info(f"📝 Title: {title[:100]}...")
             logger.info(f"📝 Category: {category}")
             logger.info(f"📝 Description length: {len(description_text)} chars")
             logger.info(f"📝 Main content length: {len(main_content)} chars")
-            logger.debug(f"📝 Prompt length: {len(prompt)} characters")
-            logger.debug(f"📝 First 500 chars of main content: {main_content[:500]}...")
+            logger.info(f"📝 First 500 chars of main content: {main_content[:500]}...")
+            logger.info(f"📝 Prompt length: {len(prompt)} characters")
+            logger.info(f"📝 First 500 chars of prompt: {prompt[:500]}...")
             start_time = time.time()
             
             # Call LLM
@@ -336,20 +368,47 @@ class LLMExtractorAgent:
             logger.info("✅ LLM response parsed successfully")
             logger.info(f"✅ Parsed data keys: {list(parsed_data.keys())}")
             
-            # Check if all required keys are present with default values
-            default_values_found = {
-                'sentiment_analysis': parsed_data.get('sentiment_analysis', {}).get('overall_sentiment') == 'neutral',
-                'stock_tickers': len(parsed_data.get('stock_tickers', [])) == 0,
-                'sectors_industries': len(parsed_data.get('sectors_industries', [])) == 0,
-                'market_impact': parsed_data.get('market_impact', {}).get('impact_scope') == 'not_mentioned',
-            }
+            # Check extraction results (new comprehensive schema)
+            sentiment_analysis = parsed_data.get('sentiment_analysis', {})
+            stock_level = parsed_data.get('stock_level', [])
+            sector_level = parsed_data.get('sector_level', [])
+            market_level = parsed_data.get('market_level', {})
+            financial_data = parsed_data.get('financial_data', {})
             
-            logger.warning(f"⚠️ Default values detected: {default_values_found}")
+            stocks_count = len(stock_level)
+            sectors_count = len(sector_level)
+            has_financial_numbers = financial_data.get('has_numbers', False)
+            overall_sentiment = sentiment_analysis.get('overall_sentiment', 'N/A')
+            market_moving = market_level.get('market_moving', False)
+            
+            logger.info(f"📋 Overall sentiment: {overall_sentiment}")
+            logger.info(f"📋 Stocks found: {stocks_count}")
+            logger.info(f"📋 Sectors found: {sectors_count}")
+            logger.info(f"📋 Has financial numbers: {has_financial_numbers}")
+            logger.info(f"📋 Market moving: {market_moving}")
+            
+            # Log stock details
+            for i, stock in enumerate(stock_level[:3]):  # Log first 3 stocks
+                ticker = stock.get('ticker', 'N/A')
+                sentiment = stock.get('sentiment', 'N/A')
+                confidence = stock.get('confidence', 0)
+                logger.info(f"📋 Stock {i+1}: {ticker} - {sentiment} (confidence: {confidence})")
+            
+            # Log sector details
+            for i, sector in enumerate(sector_level[:3]):  # Log first 3 sectors
+                name = sector.get('sector_name', 'N/A')
+                sentiment = sector.get('sentiment', 'N/A')
+                logger.info(f"📋 Sector {i+1}: {name} - {sentiment}")
+            
+            if stocks_count == 0 and sectors_count == 0 and not has_financial_numbers:
+                logger.warning("⚠️ No significant data extracted - possible issue with LLM understanding")
+            else:
+                logger.info(f"✅ Successfully extracted comprehensive data: {stocks_count} stocks, {sectors_count} sectors, financial: {has_financial_numbers}")
             
             return parsed_data
             
         except json.JSONDecodeError as e:
-            json_str_for_error = json_str if 'json_str' in locals() else 'N/A'
+            json_str_for_error = json_str if 'json_str' in locals() else response_content[:1000] if response_content else 'N/A'
             logger.error(f"❌ JSONDecodeError: {e}")
             logger.error(f"❌ JSON string that failed (first 1000 chars): {json_str_for_error[:1000] if json_str_for_error != 'N/A' else 'N/A'}")
             logger.error(f"❌ Full response that failed: {response_content}")
@@ -370,12 +429,13 @@ class LLMExtractorAgent:
             Confidence score between 0.0 and 1.0
         """
         try:
-            # Check key fields presence
+            # Check key fields presence for new comprehensive schema
             required_sections = [
                 'sentiment_analysis',
-                'financial_indicators', 
-                'market_impact',
-                'news_classification'
+                'stock_level', 
+                'sector_level',
+                'market_level',
+                'financial_data'
             ]
             
             present_sections = sum(1 for section in required_sections if section in extracted_data)
@@ -384,22 +444,56 @@ class LLMExtractorAgent:
             # Bonus points for detailed extractions
             bonus = 0.0
             
-            # Stock tickers bonus
-            stock_tickers = extracted_data.get('stock_tickers', [])
-            if stock_tickers:
-                bonus += min(len(stock_tickers) * 0.05, 0.2)
-            
-            # Numerical data bonus
-            numerical_data = extracted_data.get('numerical_data', {})
-            if numerical_data.get('has_specific_numbers', False):
+            # Sentiment analysis quality bonus
+            sentiment_analysis = extracted_data.get('sentiment_analysis', {})
+            if sentiment_analysis.get('overall_sentiment') and sentiment_analysis.get('sentiment_score') is not None:
                 bonus += 0.1
+            if sentiment_analysis.get('key_factors'):
+                bonus += min(len(sentiment_analysis['key_factors']) * 0.02, 0.1)
             
-            # Key events bonus
-            key_events = extracted_data.get('key_events', [])
-            if key_events:
-                bonus += min(len(key_events) * 0.03, 0.15)
+            # Stock level bonus
+            stock_level = extracted_data.get('stock_level', [])
+            if stock_level and len(stock_level) > 0:
+                bonus += min(len(stock_level) * 0.08, 0.25)
+                # Bonus for confidence scores
+                avg_confidence = sum(s.get('confidence', 0) for s in stock_level) / len(stock_level)
+                bonus += avg_confidence * 0.1
+            
+            # Sector level bonus
+            sector_level = extracted_data.get('sector_level', [])
+            if sector_level and len(sector_level) > 0:
+                bonus += min(len(sector_level) * 0.06, 0.2)
+            
+            # Financial data bonus
+            financial_data = extracted_data.get('financial_data', {})
+            if financial_data.get('has_numbers', False):
+                bonus += 0.15
+                # Bonus for different types of financial data
+                if financial_data.get('revenues'):
+                    bonus += 0.05
+                if financial_data.get('profits'):
+                    bonus += 0.05
+                if financial_data.get('percentages'):
+                    bonus += min(len(financial_data['percentages']) * 0.03, 0.1)
+                if financial_data.get('amounts'):
+                    bonus += min(len(financial_data['amounts']) * 0.03, 0.1)
+            
+            # Market level bonus
+            market_level = extracted_data.get('market_level', {})
+            if market_level.get('scope') and market_level.get('scope') != 'chưa xác định':
+                bonus += 0.05
+            if market_level.get('market_moving', False):
+                bonus += 0.1
+            if market_level.get('impact_magnitude'):
+                bonus += 0.05
+            
+            # Penalize empty results
+            if len(stock_level) == 0 and len(sector_level) == 0 and not financial_data.get('has_numbers', False):
+                base_score *= 0.2  # Heavy penalty for empty extraction
             
             confidence = min(base_score + bonus, 1.0)
+            logger.info(f"📊 Confidence calculation: base={base_score:.3f}, bonus={bonus:.3f}, result={confidence:.3f}")
+            
             return round(confidence, 3)
             
         except Exception as e:

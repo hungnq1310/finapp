@@ -21,6 +21,7 @@ from ...schema.extractor import (
 )
 from ...schema.request import LLMExtractorResponse
 from .extrator_agent import LLMExtractorAgent
+from ...database.llm_extraction import LLMExtractionRepository
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,15 @@ class ExtractionService:
         
         # Active sessions storage
         self.active_sessions: Dict[str, ExtractionSession] = {}
+        
+        # MongoDB repository for extraction results
+        self.mongo_repository = None
+        try:
+            self.mongo_repository = LLMExtractionRepository()
+            logger.info("✅ MongoDB LLM Extraction repository initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize MongoDB repository: {e}")
+            logger.info("📁 Results will be saved to files only")
         
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -407,10 +417,91 @@ class ExtractionService:
             json.dump(session.dict(), f, indent=2, ensure_ascii=False, default=str)
     
     def _save_batch_results(self, session_id: str, batch_num: int, batch_result: ExtractionBatchResult) -> None:
-        """Save batch results to file"""
+        """Save batch results to file and MongoDB"""
+        # Save to file (existing behavior)
         batch_file = self.output_dir / f"session_{session_id}_batch_{batch_num}.json"
         with open(batch_file, 'w', encoding='utf-8') as f:
             json.dump(batch_result.dict(), f, indent=2, ensure_ascii=False, default=str)
+        
+        # Save to MongoDB if available
+        if self.mongo_repository and batch_result.results:
+            mongo_success = 0
+            mongo_failed = 0
+            
+            logger.info(f"🔄 Saving {len(batch_result.results)} extraction results to MongoDB...")
+            
+            for result in batch_result.results:
+                try:
+                    # Prepare extraction data for MongoDB
+                    extraction_data = {
+                        "sentiment_analysis": {
+                            "overall_sentiment": result.sentiment_analysis.overall_sentiment,
+                            "sentiment_score": result.sentiment_analysis.sentiment_score,
+                            "key_factors": result.sentiment_analysis.key_factors,
+                            "extraction_timestamp": result.extraction_timestamp,
+                            "extraction_model": result.extraction_model,
+                            "confidence": result.extraction_confidence
+                        },
+                        "stock_level": [
+                            {
+                                "ticker": stock.ticker,
+                                "company_name": stock.company_name,
+                                "sentiment": stock.sentiment,
+                                "impact_type": stock.impact_type,
+                                "price_impact": stock.price_impact,
+                                "confidence": stock.confidence,
+                                "extraction_timestamp": result.extraction_timestamp,
+                                "extraction_model": result.extraction_model
+                            }
+                            for stock in result.stock_level
+                        ],
+                        "sector_level": [
+                            {
+                                "sector_name": sector.sector_name,
+                                "sentiment": sector.sentiment,
+                                "impact_description": sector.impact_description,
+                                "affected_companies": sector.affected_companies,
+                                "extraction_timestamp": result.extraction_timestamp,
+                                "extraction_model": result.extraction_model
+                            }
+                            for sector in result.sector_level
+                        ],
+                        "market_level": {
+                            "scope": result.market_level.scope,
+                            "exchange": result.market_level.exchange,
+                            "market_moving": result.market_level.market_moving,
+                            "impact_magnitude": result.market_level.impact_magnitude,
+                            "key_indices": result.market_level.key_indices,
+                            "extraction_timestamp": result.extraction_timestamp,
+                            "extraction_model": result.extraction_model
+                        },
+                        "financial_data": {
+                            "has_numbers": result.financial_data.has_numbers,
+                            "revenues": result.financial_data.revenues,
+                            "profits": result.financial_data.profits,
+                            "percentages": result.financial_data.percentages,
+                            "amounts": result.financial_data.amounts,
+                            "extraction_timestamp": result.extraction_timestamp,
+                            "extraction_model": result.extraction_model
+                        }
+                    }
+                    
+                    # Save to MongoDB
+                    if self.mongo_repository.save_complete_extraction(result.article_guid, extraction_data):
+                        mongo_success += 1
+                    else:
+                        mongo_failed += 1
+                        
+                except Exception as e:
+                    logger.error(f"❌ Failed to save extraction for {result.article_guid}: {e}")
+                    mongo_failed += 1
+            
+            logger.info(f"✅ MongoDB batch save completed: {mongo_success} successful, {mongo_failed} failed")
+        else:
+            if not self.mongo_repository:
+                logger.debug("📄 MongoDB not available, saving to files only")
+            else:
+                logger.debug("📄 No extraction results to save to MongoDB")
     
     def _generate_processing_summary(self, 
                                     session_id: str,

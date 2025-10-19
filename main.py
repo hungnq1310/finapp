@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from src.finapp.api.routes import crawler_router, extractor_router
+from src.finapp.api.routes import crawler_router, extractor_router, master_json_router, system_config_router, llm_results_router
 from src.finapp.services.crawl import VietstockCrawlerService, CrawlerScheduler
 from src.finapp.config import Config
 
@@ -91,6 +91,9 @@ app.add_middleware(
 # Include routers
 app.include_router(crawler_router)
 app.include_router(extractor_router)
+app.include_router(master_json_router)
+app.include_router(system_config_router)
+app.include_router(llm_results_router)
 
 # Health check endpoint
 @app.get("/health")
@@ -131,6 +134,27 @@ async def root():
             "sessions": "/extract/sessions",
             "model_info": "/extract/model/info",
             "config": "/extract/config"
+        },
+        "master_json_endpoints": {
+            "process_daily": "/master/process-daily",
+            "daily_summary": "/master/summary/{date}",
+            "query_data": "/master/query/{date}",
+            "stock_analysis": "/master/stock/{date}/{ticker}",
+            "sector_analysis": "/master/sector/{date}/{sector}",
+            "search": "/master/search/{date}",
+            "market_insights": "/master/insights/{date}",
+            "export_report": "/master/export-report/{date}",
+            "available_dates": "/master/available-dates"
+        },
+        "system_config_endpoints": {
+            "system_info": "/system/info",
+            "override_config": "/system/config/override",
+            "recreate_services": "/system/services/recreate",
+            "switch_sources": "/system/sources/switch",
+            "available_scenarios": "/system/scenarios",
+            "switch_llm": "/system/llm/switch",
+            "services_status": "/system/services/status",
+            "export_config": "/system/config/export"
         }
     }
 

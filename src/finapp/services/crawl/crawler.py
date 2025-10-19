@@ -8,7 +8,7 @@ while maintaining full compatibility with the existing API.
 import time
 import logging
 import os
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, date
 from typing import Optional, List, Dict, Any
 
 from .models import Article, RSSCategory, CrawlSession
@@ -40,19 +40,24 @@ class VietstockCrawlerService:
         
         # Initialize services
         self.parser = RSSParser(self.base_domain)
-        self.storage = StorageService(
+        
+        # Initialize storage with configuration
+        from ...config.dataclasses import get_source_config_by_name, StorageConfig
+        source_config = get_source_config_by_name(source_name)
+        storage_config = StorageConfig(
+            storage_type="hybrid",
             base_dir=base_dir,
-            source_name=source_name,
-            mongo_uri=mongo_uri,
-            database_name=database_name
+            mongodb_uri=mongo_uri or os.getenv("MONGODB_URI", "mongodb://localhost:27017"),
+            database_name=database_name or os.getenv("DATABASE_NAME", "financial_news")
         )
+        self.storage = StorageService(storage_config, source_config)
         
         # HTML extractor will be initialized on demand
         self.html_extractor = None
         
         logger.info(f"✅ VietstockMongoCrawlerService initialized")
         logger.info(f"🔗 Base RSS URL: {self.base_url}")
-        logger.info(f"🗄️ MongoDB Database: {self.storage.database_name}")
+        logger.info(f"🗄️ MongoDB Database: {self.storage.storage_config.database_name}")
         logger.info(f"📁 Export Directory: {self.storage.output_dir}")
         logger.info("🌐 HTML content extractor ready (lazy initialization)")
     
@@ -271,7 +276,7 @@ class VietstockCrawlerService:
         
         session = CrawlSession(
             base_url=self.base_url,
-            output_directory=self.storage.output_dir
+            output_directory=str(self.storage.output_dir)
         )
         
         try:
@@ -331,10 +336,10 @@ class VietstockCrawlerService:
             
             return {
                 'storage_backend': 'mongodb',
-                'database_name': self.storage.database_name,
+                'database_name': self.storage.storage_config.database_name,
                 'mongo_statistics': mongo_stats,
                 'export_directory': self.storage.output_dir,
-                'source': self.storage.source_name,
+                'source': self.storage.source_config.name,
                 'recent_crawl_sessions': [
                     {
                         'id': session.get('_id'),
@@ -347,16 +352,16 @@ class VietstockCrawlerService:
                     }
                     for session in recent_sessions if isinstance(session, dict)
                 ],
-                'last_updated': datetime.utcnow().isoformat()
+                'last_updated': datetime.now(datetime.timezone.utc).isoformat()
             }
             
         except Exception as e:
             logger.error(f"❌ Error getting statistics: {e}")
             return {
                 'storage_backend': 'mongodb',
-                'database_name': self.storage.database_name,
+                'database_name': self.storage.storage_config.database_name,
                 'error': str(e),
-                'last_updated': datetime.utcnow().isoformat()
+                'last_updated': datetime.now(datetime.timezone.utc).isoformat()
             }
     
     def close(self):

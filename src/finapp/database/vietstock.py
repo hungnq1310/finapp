@@ -6,7 +6,7 @@ This module provides MongoDB repository implementations specifically for Vietsto
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
@@ -53,21 +53,41 @@ class VietstockRepository(DataRepository):
             raise
     
     def _create_indexes(self):
-        """Create MongoDB indexes for better performance"""
+        """Create MongoDB indexes for better performance and duplicate prevention"""
         try:
             # Articles collection indexes
             articles_collection = self.db.vietstock_articles
-            articles_collection.create_index("content.rss_guid", unique=True)
-            articles_collection.create_index("published_at")
-            articles_collection.create_index("rss_category")
-            articles_collection.create_index("created_at")
+            
+            # Primary unique index for duplicate prevention
+            articles_collection.create_index(
+                "content.rss_guid", 
+                unique=True, 
+                sparse=True,
+                name="idx_unique_guid"
+            )
+            
+            # Performance indexes for queries
+            articles_collection.create_index([("published_at", -1)], name="idx_published_at_desc")
+            articles_collection.create_index([("rss_category", 1), ("published_at", -1)], name="idx_category_published")
+            articles_collection.create_index([("created_at", -1)], name="idx_created_at_desc")
+            articles_collection.create_index([("source.url", 1)], name="idx_source_url")
+            
+            # Content search indexes (for future search functionality)
+            articles_collection.create_index([
+                ("content.headline", "text"), 
+                ("content.summary", "text"),
+                ("content.body", "text")
+            ], name="idx_content_search")
             
             # Crawl sessions collection indexes
             sessions_collection = self.db.vietstock_crawl_sessions
-            sessions_collection.create_index("created_at")
-            sessions_collection.create_index("success")
+            sessions_collection.create_index([("created_at", -1)], name="idx_sessions_created")
+            sessions_collection.create_index("success", name="idx_sessions_success")
             
             logger.info("✅ MongoDB indexes created successfully")
+            logger.info("   - Unique index on RSS GUID for duplicate prevention")
+            logger.info("   - Performance indexes for common queries")
+            logger.info("   - Text search indexes for content")
             
         except Exception as e:
             logger.warning(f"⚠️ Could not create indexes: {e}")
@@ -297,7 +317,7 @@ class VietstockRepository(DataRepository):
                 ],
                 "daily_counts": date_stats,
                 "latest_article_date": latest_article.get("published_at") if latest_article else None,
-                "last_updated": datetime.utcnow().isoformat()
+                "last_updated": datetime.now(datetime.timezone.utc).isoformat()
             }
             
         except Exception as e:

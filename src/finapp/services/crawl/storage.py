@@ -1,8 +1,8 @@
 """
-MongoDB Storage service for Vietstock crawler
+MongoDB Storage service for flexible multi-source crawling
 
-This service replaces the SQLite-based storage with MongoDB repository
-while maintaining compatibility with the existing crawler logic.
+This service supports configurable storage backends and source-specific settings
+through dependency injection of configuration dataclasses.
 """
 
 import os
@@ -11,32 +11,68 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 import uuid
+from pathlib import Path
 
 from .models import Article, CrawlSession, RSSCategory
 from ...database.vietstock import VietstockRepository
 from ...schema.vietstock import VietstockArticle, VietstockSource, VietstockContent, VietstockCrawlSession
+from ...config.dataclasses import StorageConfig, SourceConfig
 
 logger = logging.getLogger(__name__)
 
 
 class StorageService:
-    """Service for managing data storage using MongoDB"""
+    """Configurable service for managing data storage using multiple backends"""
     
-    def __init__(self, base_dir: str = "data", source_name: str = "vietstock", 
-                 mongo_uri: str = None, database_name: str = "financial_news"):
-        self.base_dir = base_dir
-        self.source_name = source_name
-        self.mongo_uri = mongo_uri or os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-        self.database_name = database_name or os.getenv("DATABASE_NAME", "financial_news")
+    def __init__(self, storage_config: StorageConfig, source_config: SourceConfig):
+        self.storage_config = storage_config
+        self.source_config = source_config
         
-        # Initialize MongoDB repository
-        self.repository = VietstockRepository(self.mongo_uri, self.database_name)
+        # Initialize storage backend based on configuration
+        self._init_storage_backend()
         
-        # Set output directory for JSON exports (keeping for compatibility)
-        self.output_dir = os.path.join(base_dir, source_name)
-        os.makedirs(self.output_dir, exist_ok=True)
+        # Set output directory based on source config
+        if source_config.output_dir and "/" in source_config.output_dir:
+            self.output_dir = Path(storage_config.base_dir) / source_config.output_dir.split("/")[-1]
+        else:
+            self.output_dir = Path(storage_config.base_dir) / (source_config.output_dir or source_config.name)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"✅ MongoDB Storage service initialized with database: {self.database_name}")
+        logger.info(f"✅ StorageService initialized for source '{source_config.name}'")
+        logger.info(f"   Storage type: {storage_config.storage_type}")
+        logger.info(f"   Output directory: {self.output_dir}")
+        logger.info(f"   Database: {storage_config.database_name}")
+    
+    def _init_storage_backend(self):
+        """Initialize storage backend based on configuration"""
+        if self.storage_config.storage_type in ["mongodb", "hybrid"]:
+            # Initialize MongoDB repository
+            self.repository = VietstockRepository(
+                self.storage_config.mongodb_uri, 
+                self.storage_config.database_name
+            )
+            logger.info(f"   MongoDB backend: {self.storage_config.mongodb_uri}")
+        
+        # Create JSON backup directory if needed
+        if self.storage_config.storage_type in ["json", "hybrid"] or self.storage_config.local_backup:
+            self.json_enabled = True
+            logger.info(f"   JSON backup enabled: {self.storage_config.local_backup}")
+        else:
+            self.json_enabled = False
+    
+    @classmethod
+    def create_default(cls, source_name: str = "vietstock") -> 'StorageService':
+        """Create storage service with default configuration for backward compatibility"""
+        from ...config.dataclasses import get_source_config_by_name, StorageConfig
+        
+        source_config = get_source_config_by_name(source_name)
+        storage_config = StorageConfig(
+            storage_type="hybrid",
+            mongodb_uri=os.getenv("MONGODB_URI", "mongodb://localhost:27017"),
+            database_name=os.getenv("DATABASE_NAME", "financial_news")
+        )
+        
+        return cls(storage_config, source_config)
     
     def is_article_exists(self, guid: str) -> bool:
         """Check if article already exists in MongoDB"""
@@ -202,7 +238,7 @@ class StorageService:
             
             # Load existing data if file exists
             existing_data = {
-                'source': self.source_name,
+                'source': self.source_config.name,
                 'created_at': datetime.now().isoformat(),
                 'last_updated': datetime.now().isoformat(),
                 'total_articles': 0,
@@ -237,7 +273,7 @@ class StorageService:
             
             # Update data
             data = {
-                'source': self.source_name,
+                'source': self.source_config.name,
                 'created_at': existing_data.get('created_at', datetime.now().isoformat()),
                 'last_updated': datetime.now().isoformat(),
                 'total_articles': len(unique_articles),
@@ -340,7 +376,7 @@ class StorageService:
             
             # Create JSON structure
             data = {
-                "source": self.source_name,
+                "source": self.source_config.name,
                 "created_at": datetime.now().isoformat(),
                 "last_updated": datetime.now().isoformat(),
                 "total_articles": len(articles),
@@ -425,7 +461,7 @@ class StorageService:
             
             # Add MongoDB stats to session data
             session_data = session.to_dict()
-            session_data['mongo_database'] = self.database_name
+            session_data['mongo_database'] = self.storage_config.database_name
             session_data['mongo_sync'] = True
             
             with open(summary_file, 'w', encoding='utf-8') as f:
@@ -476,7 +512,7 @@ class StorageService:
                 **mongo_stats,
                 'file_stats': file_stats,
                 'storage_backend': 'mongodb',
-                'database_name': self.database_name,
+                'database_name': self.storage_config.database_name,
                 'export_directory': self.output_dir
             }
             

@@ -1,8 +1,7 @@
 """
-Pydantic Models for LLM Financial News Extractor
+Comprehensive Pydantic Models for LLM Financial News Extractor
 
-This module defines structured models for financial news analysis output,
-based on the JSON schema defined in json-schema/extractor.json.
+This module defines detailed models for 4-level financial news analysis.
 """
 
 from datetime import datetime, timezone
@@ -11,77 +10,55 @@ from pydantic import BaseModel, Field
 
 
 class SentimentAnalysis(BaseModel):
-    """Sentiment analysis results"""
-    overall_sentiment: str = Field(..., description="Phân loại cảm xúc tổng thể của bài báo")
-    sentiment_score: float = Field(..., ge=-1, le=1, description="Điểm sentiment từ -1 (rất tiêu cực) đến 1 (rất tích cực)")
-    market_sentiment: str = Field(..., description="Tâm lý thị trường: tăng giá, giảm giá, hoặc trung tính")
+    """Sentiment analysis result"""
+    overall_sentiment: str = Field(..., description="Overall sentiment: tích cực/tiêu cực/trung lập")
+    sentiment_score: float = Field(..., ge=-1, le=1, description="Sentiment score from -1 to 1")
+    key_factors: List[str] = Field(default_factory=list, description="Key factors affecting sentiment")
 
 
-class StockTicker(BaseModel):
-    """Stock ticker information"""
-    ticker: str = Field(..., pattern=r"^[A-Z]{3,4}$", description="Mã cổ phiếu (VD: VCB, FPT, HPG)")
-    exchange: Optional[str] = Field(None, description="Sàn giao dịch")
-    sentiment: str = Field(..., description="Phân loại cảm xúc đối với mã cổ phiếu này")
-    relevance_score: float = Field(..., ge=0, le=1, description="Mức độ liên quan của bài báo đến mã cổ phiếu này")
+class StockLevel(BaseModel):
+    """Stock-level analysis"""
+    ticker: str = Field(..., pattern=r"^[A-Z]{2,4}$", description="Stock ticker symbol")
+    company_name: Optional[str] = Field(None, description="Company name")
+    sentiment: str = Field(..., description="Stock sentiment: tích cực/tiêu cực/trung lập")
+    impact_type: str = Field(..., description="Type of impact: tài chính/hoạt động kinh doanh/thị trường/quản trị/pháp lý/khác")
+    price_impact: str = Field(..., description="Expected price impact: tăng/giảm/không đổi/chưa xác định")
+    confidence: float = Field(..., ge=0, le=1, description="Confidence score")
 
 
-class SectorIndustry(BaseModel):
-    """Sector/industry classification"""
-    sector_name: str = Field(..., description="Tên ngành/lĩnh vực")
-    sentiment: str = Field(..., description="Tình cảm đối với ngành/lĩnh vực này")
-    impact_level: str = Field(..., description="Mức độ tác động của tin tức đến ngành này")
+class SectorLevel(BaseModel):
+    """Sector-level analysis"""
+    sector_name: str = Field(..., description="Sector name from predefined list")
+    sentiment: str = Field(..., description="Sector sentiment: tích cực/tiêu cực/trung lập")
+    impact_description: str = Field(..., description="Description of sector impact")
+    affected_companies: List[str] = Field(default_factory=list, description="List of affected companies")
 
 
-class FinancialIndicators(BaseModel):
-    """Financial indicators mentioned in article"""
-    mentions_price: bool = Field(..., description="Có đề cập đến giá cổ phiếu không")
-    price_direction: str = Field(..., description="Hướng biến động giá được đề cập")
-    mentions_volume: bool = Field(..., description="Có đề cập đến khối lượng giao dịch không")
-    mentions_earnings: bool = Field(..., description="Có đề cập đến lợi nhuận/kết quả kinh doanh không")
-    mentions_revenue: bool = Field(..., description="Có đề cập đến doanh thu không")
-    mentions_dividends: bool = Field(..., description="Có đề cập đến cổ tức không")
-    financial_metrics: List[str] = Field(default_factory=list, description="Các chỉ số tài chính được đề cập")
+class MarketLevel(BaseModel):
+    """Market-level analysis"""
+    scope: str = Field(..., description="Impact scope: toàn thị trường/ngành cụ thể/cổ phiếu cụ thể/chưa xác định")
+    exchange: str = Field(..., description="Exchange: HOSE/HNX/UPCOM/cả ba/chưa xác định")
+    market_moving: bool = Field(..., description="Whether this news will move the market")
+    impact_magnitude: Optional[str] = Field(None, description="Impact magnitude: cao/trung bình/thấp/không ảnh hưởng")
+    key_indices: List[str] = Field(default_factory=list, description="Affected indices: VN-Index/HNX-Index/VN30/etc")
 
 
-class MarketImpact(BaseModel):
-    """Market impact assessment"""
-    impact_scope: str = Field(..., description="Phạm vi tác động của tin tức")
-    time_horizon: str = Field(..., description="Khoảng thời gian tác động dự kiến")
-    market_moving_news: bool = Field(..., description="Có phải tin tức có thể làm dao động thị trường không")
-
-
-class NewsClassification(BaseModel):
-    """News classification details"""
-    news_type: str = Field(..., description="Loại tin tức")
-    urgency: str = Field(..., description="Mức độ khẩn cấp/quan trọng của tin tức")
-    reliability_score: float = Field(..., ge=0, le=1, description="Điểm tin cậy của thông tin")
-
-
-class KeyEvent(BaseModel):
-    """Key events mentioned in article"""
-    event_type: str = Field(..., description="Loại sự kiện")
-    expected_date: Optional[str] = Field(None, description="Ngày dự kiến sự kiện (YYYY-MM-DD format)")
-    impact_assessment: str = Field(..., description="Đánh giá tác động của sự kiện")
-
-
-class NumericalData(BaseModel):
-    """Numerical data extracted from article"""
-    has_specific_numbers: bool = Field(..., description="Có chứa số liệu cụ thể không")
-    currency_amounts: List[Dict[str, Any]] = Field(default_factory=list, description="Các con số về tiền tệ được đề cập")
-    percentages: List[Dict[str, Any]] = Field(default_factory=list, description="Các tỷ lệ phần trăm được đề cập")
+class FinancialData(BaseModel):
+    """Financial numbers and data"""
+    has_numbers: bool = Field(..., description="Whether article contains financial numbers")
+    revenues: List[Dict[str, Any]] = Field(default_factory=list, description="Revenue figures")
+    profits: List[Dict[str, Any]] = Field(default_factory=list, description="Profit figures")
+    percentages: List[Dict[str, Any]] = Field(default_factory=list, description="Percentage figures")
+    amounts: List[Dict[str, Any]] = Field(default_factory=list, description="Other monetary amounts")
 
 
 class FinancialNewsExtraction(BaseModel):
-    """Complete extraction result for a financial news article"""
+    """Comprehensive extraction result with 4-level analysis"""
     sentiment_analysis: SentimentAnalysis
-    stock_tickers: List[StockTicker] = Field(default_factory=list)
-    sectors_industries: List[SectorIndustry] = Field(default_factory=list)
-    financial_indicators: FinancialIndicators
-    market_impact: MarketImpact
-    news_classification: NewsClassification
-    key_events: List[KeyEvent] = Field(default_factory=list)
-    risk_factors: List[str] = Field(default_factory=list)
-    numerical_data: NumericalData
+    stock_level: List[StockLevel] = Field(default_factory=list)
+    sector_level: List[SectorLevel] = Field(default_factory=list)
+    market_level: MarketLevel
+    financial_data: FinancialData
     
     # Article metadata
     article_guid: str = Field(..., description="Unique identifier for the article")
