@@ -29,7 +29,7 @@
         "properties": {
           "ticker": {
             "type": "string",
-            "pattern": "^[A-Z]{2,4}$"
+            "pattern": "^[A-Z][A-Z0-9&]{1,5}$"
           },
           "company_name": {"type": "string"},
           "sentiment": {
@@ -177,6 +177,47 @@
         }
       },
       "required": ["has_numbers"]
+    },
+    "report_structure": {
+      "type": "object",
+      "properties": {
+        "main_themes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "theme": {"type": "string"},
+              "importance": {"type": "string", "enum": ["cao", "trung bình", "thấp"]},
+              "key_points": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "timeline_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event": {"type": "string"},
+              "timeline": {"type": "string"},
+              "impact_level": {"type": "string", "enum": ["cao", "trung bình", "thấp"]}
+            }
+          }
+        },
+        "stakeholder_impact": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "stakeholder": {"type": "string"},
+              "impact": {"type": "string"},
+              "details": {"type": "string"}
+            }
+          }
+        }
+      }
     }
   },
   "required": ["sentiment_analysis", "stock_level", "sector_level", "market_level", "financial_data"]
