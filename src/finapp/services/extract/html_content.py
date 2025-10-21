@@ -32,7 +32,7 @@ class HTMLContentExtractor:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-        logger.info(f" HTMLContentExtractor initialized - base domain: {self.base_domain}")
+        logger.info(f"HTMLContentExtractor initialized - base domain: {self.base_domain}")
     
     def extract_html_content(self, article: Article) -> Optional[str]:
         """
@@ -45,17 +45,17 @@ class HTMLContentExtractor:
             Raw HTML content as string, or None if extraction fails
         """
         if not article.link:
-            logger.warning(f"� No link provided for article: {article.title}")
+            logger.warning(f"No link provided for article: {article.title}")
             return None
         
         try:
             # Validate and normalize URL
             url = self._normalize_url(article.link)
             if not url:
-                logger.warning(f"� Invalid URL: {article.link}")
+                logger.warning(f"Invalid URL: {article.link}")
                 return None
             
-            logger.debug(f"< Extracting HTML from: {url}")
+            logger.debug(f"Extracting HTML from: {url}")
             
             # Make request with timeout
             response = self.session.get(url, timeout=self.timeout)
@@ -64,22 +64,22 @@ class HTMLContentExtractor:
             # Check if content is HTML
             content_type = response.headers.get('content-type', '').lower()
             if 'text/html' not in content_type:
-                logger.warning(f"� Non-HTML content type for {url}: {content_type}")
+                logger.warning(f"Non-HTML content type for {url}: {content_type}")
                 return None
             
             # Return raw HTML content
             html_content = response.text
-            logger.debug(f" Extracted {len(html_content)} characters from {url}")
-            
+            logger.debug(f"Extracted {len(html_content)} characters from {url}")
+
             return html_content
             
         except requests.exceptions.Timeout:
-            logger.error(f"� Timeout extracting HTML from {article.link}")
+            logger.error(f"Timeout extracting HTML from {article.link}")
         except requests.exceptions.RequestException as e:
-            logger.error(f"L Error extracting HTML from {article.link}: {e}")
+            logger.error(f"Error extracting HTML from {article.link}: {e}")
         except Exception as e:
-            logger.error(f"L Unexpected error extracting HTML from {article.link}: {e}")
-        
+            logger.error(f"Unexpected error extracting HTML from {article.link}: {e}")
+
         return None
     
     def extract_article_content(self, article: Article) -> Dict[str, Any]:
@@ -122,10 +122,10 @@ class HTMLContentExtractor:
                 'extracted_at': article.crawled_at
             })
             
-            logger.debug(f" Successfully extracted content from {article.link}")
+            logger.debug(f"Successfully extracted content from {article.link}")
             
         except Exception as e:
-            logger.error(f"L Error in extract_article_content for {article.link}: {e}")
+            logger.error(f"Error in extract_article_content for {article.link}: {e}")
             result['error'] = str(e)
         
         return result
@@ -197,7 +197,7 @@ class HTMLContentExtractor:
                     return body.get_text(strip=True)
             
         except Exception as e:
-            logger.debug(f"� Error extracting main content: {e}")
+            logger.debug(f"Error extracting main content: {e}")
         
         return None
     
@@ -234,7 +234,7 @@ class HTMLContentExtractor:
                 results['successful_extractions'] += 1
             else:
                 results['failed_extractions'] += 1
-                logger.warning(f"� Failed to extract: {article.link} - {extraction_result.get('error', 'Unknown error')}")
+                logger.warning(f"Failed to extract: {article.link} - {extraction_result.get('error', 'Unknown error')}")
             
             # Rate limiting
             if i < len(articles) - 1:  # Don't delay after last article
@@ -242,8 +242,8 @@ class HTMLContentExtractor:
         
         results['extraction_time'] = time.time() - start_time
         
-        logger.info(f"=� Batch extraction completed: {results['successful_extractions']}/{results['total_articles']} successful")
-        logger.info(f"� Total extraction time: {results['extraction_time']:.2f}s")
+        logger.info(f"Batch extraction completed: {results['successful_extractions']}/{results['total_articles']} successful")
+        logger.info(f"Total extraction time: {results['extraction_time']:.2f}s")
         
         return results
     
@@ -251,8 +251,8 @@ class HTMLContentExtractor:
         """Close session and cleanup resources"""
         if self.session:
             self.session.close()
-            logger.info("= HTML extractor session closed")
-    
+            logger.info("HTML extractor session closed")
+
     def __enter__(self):
         return self
     

@@ -61,25 +61,25 @@ class ExtractionService:
         self.mongo_repository = None
         try:
             self.mongo_repository = LLMExtractionRepository()
-            logger.info("✅ MongoDB LLM Extraction repository initialized")
+            logger.info("MongoDB LLM Extraction repository initialized")
         except Exception as e:
-            logger.warning(f"⚠️ Could not initialize MongoDB repository: {e}")
-            logger.info("📁 Results will be saved to files only")
+            logger.warning(f"Could not initialize MongoDB repository: {e}")
+            logger.info("Results will be saved to files only")
         
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"✅ ExtractionService initialized")
-        logger.info(f"📁 Output directory: {self.output_dir}")
-        logger.info(f"📦 Batch size: {self.batch_size}")
-        logger.info(f"⏱️ Delay between articles: {self.delay_seconds}s")
-        logger.info("🔄 Extractor agent will be initialized lazily")
-    
+
+        logger.info(f"ExtractionService initialized")
+        logger.info(f"Output directory: {self.output_dir}")
+        logger.info(f"Batch size: {self.batch_size}")
+        logger.info(f"Delay between articles: {self.delay_seconds}s")
+        logger.info("Extractor agent will be initialized lazily")
+
     def _get_extractor(self) -> LLMExtractorAgent:
         """Get or create extractor agent lazily"""
         if self.extractor is None:
             self.extractor = LLMExtractorAgent()
-            logger.info(f"🤖 Extractor agent initialized: {self.extractor.model_name}")
+            logger.info(f"Extractor agent initialized: {self.extractor.model_name}")
         return self.extractor
     
     def create_session(self, 
@@ -114,13 +114,13 @@ class ExtractionService:
         # Save session info
         self._save_session(session)
         
-        logger.info(f"✅ Created extraction session: {session_id}")
+        logger.info(f"Created extraction session: {session_id}")
         if session_name:
-            logger.info(f"📝 Session name: {session_name}")
+            logger.info(f"Session name: {session_name}")
         if total_articles:
-            logger.info(f"📊 Total articles: {total_articles}")
-            logger.info(f"📦 Estimated batches: {total_batches}")
-        
+            logger.info(f"Total articles: {total_articles}")
+            logger.info(f"Estimated batches: {total_batches}")
+
         return session_id
     
     def process_articles_from_json(self, 
@@ -158,9 +158,9 @@ class ExtractionService:
                     session = self.active_sessions[session_id]
                     session.total_articles = len(articles)
                     session.total_batches = (len(articles) + self.batch_size - 1) // self.batch_size
-            
-            logger.info(f"🚀 Processing {len(articles)} articles from {json_file_path}")
-            
+
+            logger.info(f"Processing {len(articles)} articles from {json_file_path}")
+
             # Process articles in batches
             batch_results = []
             total_processed = 0
@@ -170,9 +170,9 @@ class ExtractionService:
             for i in range(0, len(articles), self.batch_size):
                 batch = articles[i:i + self.batch_size]
                 batch_num = (i // self.batch_size) + 1
-                
-                logger.info(f"📦 Processing batch {batch_num}/{(len(articles) + self.batch_size - 1) // self.batch_size}")
-                
+
+                logger.info(f"Processing batch {batch_num}/{(len(articles) + self.batch_size - 1) // self.batch_size}")
+
                 try:
                     # Update session status
                     if session_id in self.active_sessions:
@@ -202,11 +202,11 @@ class ExtractionService:
                         session.failed_extractions += batch_result.failed_extractions
                         self._save_session(session)
                     
-                    logger.info(f"✅ Batch {batch_num} completed: {batch_result.successful_extractions}/{batch_result.total_articles} successful")
+                    logger.info(f"Batch {batch_num} completed: {batch_result.successful_extractions}/{batch_result.total_articles} successful")
                     
                 except Exception as e:
                     error_msg = f"Batch {batch_num} failed: {str(e)}"
-                    logger.error(f"❌ {error_msg}")
+                    logger.error(f"{error_msg}")
                     
                     # Update session with error
                     if session_id in self.active_sessions:
@@ -243,10 +243,10 @@ class ExtractionService:
             summary_file = self.output_dir / f"session_{session_id}_summary.json"
             with open(summary_file, 'w', encoding='utf-8') as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False, default=str)
-            
-            logger.info(f"🎉 Processing completed for session {session_id}")
-            logger.info(f"📊 Overall success rate: {overall_success_rate:.1f}% ({total_successful}/{total_processed})")
-            
+
+            logger.info(f"Processing completed for session {session_id}")
+            logger.info(f"Overall success rate: {overall_success_rate:.1f}% ({total_successful}/{total_processed})")
+
             return LLMExtractorResponse(
                 success=True,
                 message=f"Successfully processed {total_processed} articles",
@@ -265,8 +265,8 @@ class ExtractionService:
             
         except Exception as e:
             error_msg = f"Processing failed: {str(e)}"
-            logger.error(f"❌ {error_msg}")
-            
+            logger.error(f"{error_msg}")
+
             # Update session with error
             if session_id and session_id in self.active_sessions:
                 session = self.active_sessions[session_id]
@@ -318,8 +318,8 @@ class ExtractionService:
                     session_data = json.load(f)
                 return session_data
             except Exception as e:
-                logger.error(f"❌ Failed to load session {session_id}: {e}")
-        
+                logger.error(f"Failed to load session {session_id}: {e}")
+
         return None
     
     def get_extraction_results(self, session_id: str) -> Dict[str, Any]:
@@ -352,8 +352,8 @@ class ExtractionService:
                     results["extractions"].extend(batch_data["results"])
                     
             except Exception as e:
-                logger.error(f"❌ Failed to load batch file {batch_file}: {e}")
-        
+                logger.error(f"Failed to load batch file {batch_file}: {e}")
+
         # Load summary if available
         summary_file = self.output_dir / f"session_{session_id}_summary.json"
         if summary_file.exists():
@@ -362,8 +362,8 @@ class ExtractionService:
                     summary_data = json.load(f)
                 results["summary"] = summary_data
             except Exception as e:
-                logger.error(f"❌ Failed to load summary file {summary_file}: {e}")
-        
+                logger.error(f"Failed to load summary file {summary_file}: {e}")
+
         return results
     
     def _load_articles_from_json(self, json_file_path: str) -> List[Dict[str, Any]]:
@@ -402,12 +402,12 @@ class ExtractionService:
                             "link": article.get("link", ""),
                             "pub_date": article.get("pub_date", "")
                         })
-            
-            logger.info(f"📄 Loaded {len(articles)} articles with HTML content from {json_file_path}")
+
+            logger.info(f"Loaded {len(articles)} articles with HTML content from {json_file_path}")
             return articles
             
         except Exception as e:
-            logger.error(f"❌ Failed to load articles from {json_file_path}: {e}")
+            logger.error(f"Failed to load articles from {json_file_path}: {e}")
             raise
     
     def _save_session(self, session: ExtractionSession) -> None:
@@ -427,9 +427,9 @@ class ExtractionService:
         if self.mongo_repository and batch_result.results:
             mongo_success = 0
             mongo_failed = 0
-            
-            logger.info(f"🔄 Saving {len(batch_result.results)} extraction results to MongoDB...")
-            
+
+            logger.info(f"Saving {len(batch_result.results)} extraction results to MongoDB...")
+
             for result in batch_result.results:
                 try:
                     # Prepare extraction data for MongoDB
@@ -493,17 +493,17 @@ class ExtractionService:
                         mongo_failed += 1
                         
                 except Exception as e:
-                    logger.error(f"❌ Failed to save extraction for {result.article_guid}: {e}")
+                    logger.error(f"Failed to save extraction for {result.article_guid}: {e}")
                     mongo_failed += 1
-            
-            logger.info(f"✅ MongoDB batch save completed: {mongo_success} successful, {mongo_failed} failed")
+
+            logger.info(f"MongoDB batch save completed: {mongo_success} successful, {mongo_failed} failed")
         else:
             if not self.mongo_repository:
-                logger.debug("📄 MongoDB not available, saving to files only")
+                logger.debug("MongoDB not available, saving to files only")
             else:
-                logger.debug("📄 No extraction results to save to MongoDB")
-    
-    def _generate_processing_summary(self, 
+                logger.debug("No extraction results to save to MongoDB")
+
+    def _generate_processing_summary(self,
                                     session_id: str,
                                     source_file: str,
                                     total_articles: int,
@@ -567,8 +567,8 @@ class ExtractionService:
                         "source": "file"
                     })
             except Exception as e:
-                logger.warning(f"⚠️ Failed to load session file {session_file}: {e}")
-        
+                logger.warning(f"Failed to load session file {session_file}: {e}")
+
         # Sort by start time (newest first)
         sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
         return sessions

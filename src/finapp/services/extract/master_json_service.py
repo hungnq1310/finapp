@@ -20,8 +20,17 @@ logger = logging.getLogger(__name__)
 class MasterJSONService:
     """Service for managing daily master JSON files with organized 3-level data"""
     
-    def __init__(self, base_dir: str = "data/master"):
-        self.base_dir = Path(base_dir)
+    def __init__(self, base_dir: Optional[str] = None):
+        # Load from config if not provided
+        resolved_base_dir: str
+        if base_dir is None:
+            from ...config import Config
+            config = Config()
+            resolved_base_dir = config.MASTER_JSON_DIR
+        else:
+            resolved_base_dir = base_dir
+        
+        self.base_dir = Path(resolved_base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         # Directory for current month
@@ -29,7 +38,7 @@ class MasterJSONService:
         self.current_month_dir = self.base_dir / f"{today.year:04d}/{today.month:02d}"
         self.current_month_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"✅ MasterJSONService initialized with base_dir: {self.base_dir}")
+        logger.info(f"MasterJSONService initialized with base_dir: {self.base_dir}")
     
     def get_master_file_path(self, target_date: str) -> Path:
         """Get the path to master JSON file for a specific date"""
@@ -175,7 +184,7 @@ class MasterJSONService:
             with open(master_file, 'w', encoding='utf-8') as f:
                 json.dump(master_data, f, ensure_ascii=False, indent=2, default=str)
             
-            logger.info(f"✅ Added article {article_guid} to master file for {target_date}")
+            logger.info(f"Added article {article_guid} to master file for {target_date}")
             
             return {
                 "success": True,
@@ -186,7 +195,7 @@ class MasterJSONService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to append extraction to master file for {target_date}: {e}")
+            logger.error(f"Failed to append extraction to master file for {target_date}: {e}")
             return {"success": False, "error": str(e)}
     
     def _update_indexes(self, master_data: Dict, article_entry: Dict, article_index: int):
@@ -369,7 +378,7 @@ class MasterJSONService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to query master data for {target_date}: {e}")
+            logger.error(f"Failed to query master data for {target_date}: {e}")
             return {"success": False, "error": str(e)}
     
     def get_stock_analysis(self, target_date: str, ticker: str, include_full_content: bool = False) -> Dict[str, Any]:
@@ -511,7 +520,7 @@ class MasterJSONService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to get available dates: {e}")
+            logger.error(f"Failed to get available dates: {e}")
             return {"success": False, "error": str(e)}
     
     def export_report_data(self, target_date: str, tickers: Optional[List[str]] = None, sectors: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -570,7 +579,7 @@ class MasterJSONService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Failed to export report data for {target_date}: {e}")
+            logger.error(f"Failed to export report data for {target_date}: {e}")
             return {"success": False, "error": str(e)}
     
     def _generate_executive_summary(self, articles: List[Dict]) -> Dict[str, Any]:
