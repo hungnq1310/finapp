@@ -148,7 +148,7 @@ class RSSParser:
                     unique_categories.append(cat)
             
             categories = unique_categories
-            logger.info(f"✅ Found {len(categories)} main categories")
+            logger.info(f"Found {len(categories)} main categories")
             
             # Debug: Print first few categories
             for i, cat in enumerate(categories[:3]):
@@ -160,10 +160,10 @@ class RSSParser:
             return categories
             
         except requests.RequestException as e:
-            logger.error(f"❌ Network error getting categories: {e}")
+            logger.error(f"Network error getting categories: {e}")
             raise Exception(f"Network error: {e}")
         except Exception as e:
-            logger.error(f"❌ Error parsing categories: {e}")
+            logger.error(f"Error parsing categories: {e}")
             raise Exception(f"Parse error: {e}")
     
     def parse_rss_feed(self, rss_url: str, category_name: str, filter_by_today: bool = True) -> List[Article]:
@@ -181,13 +181,13 @@ class RSSParser:
             List of Article objects
         """
         filter_info = " (today only)" if filter_by_today else ""
-        logger.info(f"📡 Parsing RSS: {category_name}{filter_info} - {rss_url}")
+        logger.info(f"Parsing RSS: {category_name}{filter_info} - {rss_url}")
         
         try:
             feed = feedparser.parse(rss_url)
             
             if feed.bozo:
-                logger.warning(f"⚠️ RSS parsing warning for {category_name}: {feed.bozo_exception}")
+                logger.warning(f"RSS parsing warning for {category_name}: {feed.bozo_exception}")
             
             articles = []
             total_entries = len(feed.entries) if feed.entries else 0
@@ -202,7 +202,7 @@ class RSSParser:
                         # RSS feeds are chronological (newest first), so if we find a non-today 
                         # article, all subsequent articles will also be non-today
                         remaining = total_entries - i
-                        logger.info(f"📅 Found non-today article at position {i+1}/{total_entries}, stopping early ({remaining} articles skipped)")
+                        logger.info(f"Found non-today article at position {i+1}/{total_entries}, stopping early ({remaining} articles skipped)")
                         break
                     else:
                         non_today_count += 1
@@ -231,14 +231,14 @@ class RSSParser:
                 articles.append(article)
             
             if filter_by_today:
-                logger.info(f"✅ Found {len(articles)} articles from today (skipped {non_today_count} non-today)")
+                logger.info(f"Found {len(articles)} articles from today (skipped {non_today_count} non-today)")
             else:
-                logger.info(f"✅ Found {len(articles)} total articles")
+                logger.info(f"Found {len(articles)} total articles")
                 
             return articles
             
         except Exception as e:
-            logger.error(f"❌ Error parsing RSS {rss_url}: {e}")
+            logger.error(f"Error parsing RSS {rss_url}: {e}")
             return []
     
     def test_feed(self, feed_url: str) -> Dict[str, Any]:

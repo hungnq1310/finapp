@@ -55,11 +55,11 @@ class VietstockCrawlerService:
         # HTML extractor will be initialized on demand
         self.html_extractor = None
         
-        logger.info(f"✅ VietstockMongoCrawlerService initialized")
-        logger.info(f"🔗 Base RSS URL: {self.base_url}")
-        logger.info(f"🗄️ MongoDB Database: {self.storage.storage_config.database_name}")
-        logger.info(f"📁 Export Directory: {self.storage.output_dir}")
-        logger.info("🌐 HTML content extractor ready (lazy initialization)")
+        logger.info(f"VietstockMongoCrawlerService initialized")
+        logger.info(f"Base RSS URL: {self.base_url}")
+        logger.info(f"MongoDB Database: {self.storage.storage_config.database_name}")
+        logger.info(f"Export Directory: {self.storage.output_dir}")
+        logger.info("HTML content extractor ready (lazy initialization)")
     
     def _get_html_extractor(self):
         """Get HTML extractor instance (lazy initialization)"""
@@ -67,9 +67,9 @@ class VietstockCrawlerService:
             try:
                 from ..extract import HTMLContentExtractor
                 self.html_extractor = HTMLContentExtractor(base_domain=self.base_domain)
-                logger.info("🌐 HTML extractor initialized")
+                logger.info("HTML extractor initialized")
             except ImportError as e:
-                logger.error(f"❌ Failed to import HTMLContentExtractor: {e}")
+                logger.error(f"Failed to import HTMLContentExtractor: {e}")
                 raise
         return self.html_extractor
     
@@ -88,7 +88,7 @@ class VietstockCrawlerService:
         category_url = category.url
         
         filter_info = " (today only)" if filter_by_today else ""
-        logger.info(f"📁 Crawling category: {category_name}{filter_info}")
+        logger.info(f"Crawling category: {category_name}{filter_info}")
         
         try:
             # Crawl main category (parser handles date filtering now)
@@ -103,7 +103,7 @@ class VietstockCrawlerService:
             # Save new articles to MongoDB and file in one batch
             if new_articles:
                 self.storage.save_articles_to_file(new_articles, category_name)
-                logger.info(f"✅ Saved {len(new_articles)} new articles from {category_name}")
+                logger.info(f"Saved {len(new_articles)} new articles from {category_name}")
             
             # Crawl subcategories
             for subcat in category.subcategories:
@@ -120,21 +120,21 @@ class VietstockCrawlerService:
                     
                     if new_subcat_articles:
                         self.storage.save_articles_to_file(new_subcat_articles, category_name)
-                        logger.info(f"✅ Saved {len(new_subcat_articles)} new articles from {subcat.name}")
+                        logger.info(f"Saved {len(new_subcat_articles)} new articles from {subcat.name}")
                     
                     time.sleep(0.5)  # Rate limiting
                     
                 except Exception as e:
-                    logger.error(f"❌ Error crawling subcategory {subcat.name}: {e}")
+                    logger.error(f"Error crawling subcategory {subcat.name}: {e}")
             
             total_new = len(new_articles)
-            logger.info(f"📊 Category {category_name}: {total_new} new articles")
+            logger.info(f"Category {category_name}: {total_new} new articles")
             
             time.sleep(1)  # Rate limiting between main categories
             return total_new
             
         except Exception as e:
-            logger.error(f"❌ Error crawling category {category_name}: {e}")
+            logger.error(f"Error crawling category {category_name}: {e}")
             return 0
     
     def extract_html_for_articles(self, articles: List[Article], extract_delay: Optional[float] = None) -> Dict[str, Any]:
@@ -149,10 +149,10 @@ class VietstockCrawlerService:
             Extraction results summary
         """
         if not articles:
-            logger.info("📄 No articles to extract HTML from")
+            logger.info("No articles to extract HTML from")
             return {'total_articles': 0, 'successful_extractions': 0, 'failed_extractions': 0}
         
-        logger.info(f"🌐 Starting HTML extraction for {len(articles)} articles")
+        logger.info(f"Starting HTML extraction for {len(articles)} articles")
         
         try:
             # Use HTML extractor for batch processing
@@ -175,7 +175,7 @@ class VietstockCrawlerService:
                     else:
                         failed_count += 1
             
-            logger.info(f"📊 HTML extraction completed: {successful_count}/{len(articles)} successful")
+            logger.info(f"HTML extraction completed: {successful_count}/{len(articles)} successful")
             
             return {
                 'total_articles': len(articles),
@@ -185,7 +185,7 @@ class VietstockCrawlerService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Error during HTML extraction: {e}")
+            logger.error(f"Error during HTML extraction: {e}")
             return {
                 'total_articles': len(articles),
                 'successful_extractions': 0,
@@ -204,14 +204,14 @@ class VietstockCrawlerService:
         Returns:
             CrawlSession with extraction results
         """
-        logger.info(f"🚀 Starting comprehensive crawl session{' with HTML extraction' if extract_html else ''}")
+        logger.info(f"Starting comprehensive crawl session{' with HTML extraction' if extract_html else ''}")
         
         # Start regular crawling
         session = self.crawl_all_categories(filter_by_today)
         session.html_extraction_enabled = extract_html
         
         if extract_html and session.total_articles > 0:
-            logger.info(f"🌐 Starting HTML extraction for {session.total_articles} articles")
+            logger.info(f"Starting HTML extraction for {session.total_articles} articles")
             
             try:
                 # Get recent articles from MongoDB
@@ -253,10 +253,10 @@ class VietstockCrawlerService:
                     
                     # Update session with extraction info
                     session.html_extraction_results = extraction_results
-                    logger.info(f"🌐 HTML extraction completed: {extraction_results}")
+                    logger.info(f"HTML extraction completed: {extraction_results}")
                 
             except Exception as e:
-                logger.error(f"❌ Error during HTML extraction phase: {e}")
+                logger.error(f"Error during HTML extraction phase: {e}")
                 session.html_extraction_error = str(e)
         
         return session
@@ -272,7 +272,7 @@ class VietstockCrawlerService:
             CrawlSession object with results
         """
         filter_info = " (today only)" if filter_by_today else ""
-        logger.info(f"🚀 Starting Vietstock RSS crawl session{filter_info}")
+        logger.info(f"Starting Vietstock RSS crawl session{filter_info}")
         
         session = CrawlSession(
             base_url=self.base_url,
@@ -317,10 +317,10 @@ class VietstockCrawlerService:
             # Save summary to MongoDB and file
             self.storage.save_crawl_summary(session)
             
-            logger.info(f"🎉 Crawl session completed. Total new articles: {total_articles}")
+            logger.info(f"Crawl session completed. Total new articles: {total_articles}")
             
         except Exception as e:
-            logger.error(f"❌ Crawl session failed: {e}")
+            logger.error(f"Crawl session failed: {e}")
             session.total_articles = 0
         
         return session
@@ -356,7 +356,7 @@ class VietstockCrawlerService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Error getting statistics: {e}")
+            logger.error(f"Error getting statistics: {e}")
             return {
                 'storage_backend': 'mongodb',
                 'database_name': self.storage.storage_config.database_name,
@@ -369,9 +369,9 @@ class VietstockCrawlerService:
         try:
             if self.storage:
                 self.storage.close()
-            logger.info("🔌 VietstockMongoCrawlerService closed")
+            logger.info("VietstockMongoCrawlerService closed")
         except Exception as e:
-            logger.error(f"❌ Error closing crawler service: {e}")
+            logger.error(f"Error closing crawler service: {e}")
     
     def __enter__(self):
         """Context manager entry"""

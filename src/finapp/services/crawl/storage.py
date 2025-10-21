@@ -38,7 +38,7 @@ class StorageService:
             self.output_dir = Path(storage_config.base_dir) / (source_config.output_dir or source_config.name)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"✅ StorageService initialized for source '{source_config.name}'")
+        logger.info(f"StorageService initialized for source '{source_config.name}'")
         logger.info(f"   Storage type: {storage_config.storage_type}")
         logger.info(f"   Output directory: {self.output_dir}")
         logger.info(f"   Database: {storage_config.database_name}")
@@ -80,7 +80,7 @@ class StorageService:
             article = self.repository.find_article_by_guid(guid)
             return article is not None
         except Exception as e:
-            logger.error(f"❌ Error checking article existence: {e}")
+            logger.error(f"Error checking article existence: {e}")
             return False
     
     def save_article_to_db(self, article: Article) -> bool:
@@ -93,7 +93,7 @@ class StorageService:
                 # Update existing article with HTML content only
                 success = self._update_article_html_content(existing_article, article)
                 if success:
-                    logger.debug(f"✅ Updated HTML content for existing article: {article.guid}")
+                    logger.debug(f"Updated HTML content for existing article: {article.guid}")
                 return success
             else:
                 # Convert Article model to VietstockArticle (new article)
@@ -103,12 +103,12 @@ class StorageService:
                 success = self.repository.save_article(vietstock_article)
                 
                 if success:
-                    logger.debug(f"✅ Created new article in MongoDB: {article.guid}")
+                    logger.debug(f"Created new article in MongoDB: {article.guid}")
                 
                 return success
             
         except Exception as e:
-            logger.error(f"❌ Error saving article to MongoDB: {e}")
+            logger.error(f"Error saving article to MongoDB: {e}")
             return False
     
     def _update_article_html_content(self, existing_doc: Dict, new_article: Article) -> bool:
@@ -141,7 +141,7 @@ class StorageService:
             return result.modified_count > 0
             
         except Exception as e:
-            logger.error(f"❌ Error updating HTML content for article {new_article.guid}: {e}")
+            logger.error(f"Error updating HTML content for article {new_article.guid}: {e}")
             return False
     
     def _update_html_in_json_file(self, article: Article) -> bool:
@@ -151,7 +151,7 @@ class StorageService:
             current_file = self.get_current_articles_file()
             
             if not os.path.exists(current_file):
-                logger.warning(f"⚠️ JSON file {current_file} does not exist, cannot update HTML content")
+                logger.warning(f"JSON file {current_file} does not exist, cannot update HTML content")
                 return False
             
             # Load existing data
@@ -182,14 +182,14 @@ class StorageService:
                 with open(latest_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False, indent=2)
                 
-                logger.debug(f"✅ Updated HTML content in JSON file for article: {article.guid}")
+                logger.debug(f"Updated HTML content in JSON file for article: {article.guid}")
                 return True
             else:
-                logger.warning(f"⚠️ Article {article.guid} not found in JSON file for HTML update")
+                logger.warning(f"Article {article.guid} not found in JSON file for HTML update")
                 return False
             
         except Exception as e:
-            logger.error(f"❌ Error updating HTML content in JSON file for article {article.guid}: {e}")
+            logger.error(f"Error updating HTML content in JSON file for article {article.guid}: {e}")
             return False
     
     def save_articles_batch(self, articles: List[Article]) -> Dict[str, int]:
@@ -205,16 +205,16 @@ class StorageService:
                     vietstock_article = self._convert_to_vietstock_article(article)
                     vietstock_articles.append(vietstock_article)
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to convert article {article.guid}: {e}")
+                    logger.warning(f"Failed to convert article {article.guid}: {e}")
             
             # Save batch to MongoDB
             results = self.repository.save_articles_batch(vietstock_articles)
             
-            logger.info(f"📊 Batch save to MongoDB: {results}")
+            logger.info(f"Batch save to MongoDB: {results}")
             return results
             
         except Exception as e:
-            logger.error(f"❌ Error in batch save to MongoDB: {e}")
+            logger.error(f"Error in batch save to MongoDB: {e}")
             return {"success": 0, "failed": len(articles), "duplicates": 0}
     
     def save_articles_to_file(self, articles: List[Article], category_name: str = "") -> bool:
@@ -231,7 +231,7 @@ class StorageService:
             
             # Ensure JSON file exists (restore from MongoDB if missing)
             if not self.ensure_json_file_exists():
-                logger.warning("⚠️ Could not ensure JSON file exists, proceeding with new articles only")
+                logger.warning("Could not ensure JSON file exists, proceeding with new articles only")
             
             # Export to JSON file (keeping existing structure for compatibility)
             current_file = self.get_current_articles_file()
@@ -250,7 +250,7 @@ class StorageService:
                     with open(current_file, 'r', encoding='utf-8') as f:
                         existing_data = json.load(f)
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not load existing file {current_file}: {e}")
+                    logger.warning(f"Could not load existing file {current_file}: {e}")
             
             # Add new articles data
             new_articles_data = [article.to_dict() for article in articles]
@@ -290,12 +290,12 @@ class StorageService:
             with open(latest_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"💾 Exported {len(new_articles_data)} articles to {current_file}")
-            logger.info(f"📊 MongoDB sync stats: {batch_results}")
+            logger.info(f"Exported {len(new_articles_data)} articles to {current_file}")
+            logger.info(f"MongoDB sync stats: {batch_results}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error saving articles to file: {e}")
+            logger.error(f"Error saving articles to file: {e}")
             return False
     
     def get_current_articles_file(self) -> str:
@@ -332,10 +332,10 @@ class StorageService:
             articles_dicts = self.repository.find_articles_by_date_range(start_date, end_date)
             
             if not articles_dicts:
-                logger.info(f"ℹ️ No articles found in MongoDB for {target_date}")
+                logger.info(f"No articles found in MongoDB for {target_date}")
                 return False
             
-            logger.info(f"🔄 Found {len(articles_dicts)} articles in MongoDB for {target_date}")
+            logger.info(f"Found {len(articles_dicts)} articles in MongoDB for {target_date}")
             
             # Convert MongoDB documents to Article format
             articles = []
@@ -363,10 +363,10 @@ class StorageService:
                         }
                         articles.append(article)
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to convert article from MongoDB: {e}")
+                    logger.warning(f"Failed to convert article from MongoDB: {e}")
             
             if not articles:
-                logger.warning("⚠️ No valid articles could be converted from MongoDB")
+                logger.warning("No valid articles could be converted from MongoDB")
                 return False
             
             # Save to JSON file using existing method
@@ -399,11 +399,11 @@ class StorageService:
             with open(latest_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"✅ Restored {len(articles)} articles from MongoDB to {articles_file}")
+            logger.info(f"Restored {len(articles)} articles from MongoDB to {articles_file}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error restoring from MongoDB: {e}")
+            logger.error(f"Error restoring from MongoDB: {e}")
             return False
     
     def ensure_json_file_exists(self, date_filter: Optional[str] = None) -> bool:
@@ -429,22 +429,22 @@ class StorageService:
             
             # Check if file already exists
             if os.path.exists(articles_file):
-                logger.debug(f"ℹ️ JSON file already exists: {articles_file}")
+                logger.debug(f"JSON file already exists: {articles_file}")
                 return True
             
-            logger.warning(f"⚠️ JSON file missing: {articles_file}")
+            logger.warning(f"JSON file missing: {articles_file}")
             
             # Try to restore from MongoDB
             restored = self.restore_from_mongodb(date_filter)
             if restored:
-                logger.info(f"✅ Successfully restored JSON file from MongoDB")
+                logger.info(f"Successfully restored JSON file from MongoDB")
                 return True
             else:
-                logger.warning(f"⚠️ Could not restore JSON file from MongoDB")
+                logger.warning(f"Could not restore JSON file from MongoDB")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Error ensuring JSON file exists: {e}")
+            logger.error(f"Error ensuring JSON file exists: {e}")
             return False
     
     def save_crawl_summary(self, session: CrawlSession):
@@ -472,10 +472,10 @@ class StorageService:
             with open(latest_file, 'w', encoding='utf-8') as f:
                 json.dump(session_data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"📊 Crawl summary saved to MongoDB and {summary_file}")
+            logger.info(f"Crawl summary saved to MongoDB and {summary_file}")
             
         except Exception as e:
-            logger.error(f"❌ Error saving summary: {e}")
+            logger.error(f"Error saving summary: {e}")
     
     def get_daily_folder_path(self) -> str:
         """Get daily folder path for storing files"""
@@ -490,7 +490,7 @@ class StorageService:
             stats = self.repository.get_articles_statistics()
             return stats.get('categories', [])
         except Exception as e:
-            logger.error(f"❌ Error getting categories summary: {e}")
+            logger.error(f"Error getting categories summary: {e}")
             return []
     
     def get_articles_statistics(self) -> Dict[str, Any]:
@@ -519,7 +519,7 @@ class StorageService:
             return combined_stats
             
         except Exception as e:
-            logger.error(f"❌ Error getting articles statistics: {e}")
+            logger.error(f"Error getting articles statistics: {e}")
             return {
                 'error': str(e),
                 'storage_backend': 'mongodb',
@@ -531,11 +531,11 @@ class StorageService:
         try:
             # This would require implementing a reset method in the repository
             # For now, just log the action
-            logger.warning("⚠️ MongoDB reset not implemented yet - use database management tools")
-            logger.info("🗑️ To reset MongoDB, manually drop the collections or database")
+            logger.warning("MongoDB reset not implemented yet - use database management tools")
+            logger.info("To reset MongoDB, manually drop the collections or database")
             
         except Exception as e:
-            logger.error(f"❌ Error resetting database: {e}")
+            logger.error(f"Error resetting database: {e}")
     
     def _convert_to_vietstock_article(self, article: Article) -> VietstockArticle:
         """Convert Article model to VietstockArticle schema"""
@@ -591,7 +591,7 @@ class StorageService:
             return vietstock_article
             
         except Exception as e:
-            logger.error(f"❌ Error converting article to Vietstock schema: {e}")
+            logger.error(f"Error converting article to Vietstock schema: {e}")
             raise
     
     def _convert_to_crawl_session(self, session: CrawlSession) -> VietstockCrawlSession:
@@ -622,11 +622,11 @@ class StorageService:
             return vietstock_session
             
         except Exception as e:
-            logger.error(f"❌ Error converting crawl session to Vietstock schema: {e}")
+            logger.error(f"Error converting crawl session to Vietstock schema: {e}")
             raise
     
     def close(self):
         """Close MongoDB connection"""
         if self.repository:
             self.repository.close()
-            logger.info("🔌 MongoDB storage service closed")
+            logger.info("MongoDB storage service closed")

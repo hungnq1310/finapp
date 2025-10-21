@@ -30,7 +30,7 @@ class CrawlerScheduler:
     def start(self, run_immediately: bool = True):
         """Start the scheduler"""
         if self.is_running:
-            logger.warning("⚠️ Scheduler is already running")
+            logger.warning("Scheduler is already running")
             return
         
         try:
@@ -49,21 +49,21 @@ class CrawlerScheduler:
             self.scheduler.start()
             self.is_running = True
             
-            logger.info(f"⏰ Scheduler started - crawling every {self.interval_minutes} minutes")
+            logger.info(f"Scheduler started - crawling every {self.interval_minutes} minutes")
             
             # Run initial crawl if requested
             if run_immediately:
-                logger.info("🚀 Running initial crawl")
+                logger.info("Running initial crawl")
                 self._crawl_job()
                 
         except Exception as e:
-            logger.error(f"❌ Failed to start scheduler: {e}")
+            logger.error(f"Failed to start scheduler: {e}")
             raise
     
     def stop(self):
         """Stop the scheduler"""
         if not self.is_running:
-            logger.warning("⚠️ Scheduler is not running")
+            logger.warning("Scheduler is not running")
             return
         
         try:
@@ -75,10 +75,10 @@ class CrawlerScheduler:
             
             self.scheduler.shutdown(wait=False)
             self.is_running = False
-            logger.info("🛑 Scheduler stopped")
+            logger.info("Scheduler stopped")
             
         except Exception as e:
-            logger.error(f"❌ Error stopping scheduler: {e}")
+            logger.error(f"Error stopping scheduler: {e}")
     
     def shutdown(self):
         """Cleanup method called on exit"""
@@ -88,11 +88,11 @@ class CrawlerScheduler:
     def trigger_manual_crawl(self, filter_by_today: bool = True, extract_html: bool = False):
         """Trigger a manual crawl job"""
         if not self.is_running:
-            logger.warning("⚠️ Scheduler is not running. Start the scheduler first.")
+            logger.warning("Scheduler is not running. Start the scheduler first.")
             return False
         
         try:
-            logger.info("🔄 Triggering manual crawl")
+            logger.info("Triggering manual crawl")
             self.scheduler.add_job(
                 func=self._crawl_job_with_params,
                 args=[filter_by_today, extract_html],
@@ -103,25 +103,25 @@ class CrawlerScheduler:
             return True
             
         except Exception as e:
-            logger.error(f"❌ Failed to trigger manual crawl: {e}")
+            logger.error(f"Failed to trigger manual crawl: {e}")
             return False
     
     def _crawl_job_with_params(self, filter_by_today: bool = True, extract_html: bool = False):
         """Internal crawl job method with parameters"""
         try:
-            logger.info(f"🚀 Starting manual crawl session (filter_today={filter_by_today}, extract_html={extract_html})")
+            logger.info(f"Starting manual crawl session (filter_today={filter_by_today}, extract_html={extract_html})")
             if extract_html:
                 session = self.crawler_service.crawl_with_html_extraction(filter_by_today, extract_html)
             else:
                 session = self.crawler_service.crawl_all_categories(filter_by_today)
             
             if session.total_articles > 0:
-                logger.info(f"✅ Manual crawl completed. New articles: {session.total_articles}")
+                logger.info(f"Manual crawl completed. New articles: {session.total_articles}")
             else:
-                logger.info("ℹ️ Manual crawl completed. No new articles found")
+                logger.info("Manual crawl completed. No new articles found")
                 
         except Exception as e:
-            logger.error(f"❌ Manual crawl failed: {e}")
+            logger.error(f"Manual crawl failed: {e}")
     
     def get_next_run_time(self) -> Optional[str]:
         """Get next scheduled run time"""
@@ -135,7 +135,7 @@ class CrawlerScheduler:
             return None
             
         except Exception as e:
-            logger.error(f"❌ Error getting next run time: {e}")
+            logger.error(f"Error getting next run time: {e}")
             return None
     
     def get_status(self) -> dict:
@@ -150,19 +150,19 @@ class CrawlerScheduler:
     def _crawl_job(self):
         """Internal crawl job method"""
         try:
-            logger.info(f"🚀 Starting scheduled crawl session (filter_today={self.filter_by_today}, extract_html={self.extract_html})")
+            logger.info(f"Starting scheduled crawl session (filter_today={self.filter_by_today}, extract_html={self.extract_html})")
             if self.extract_html:
                 session = self.crawler_service.crawl_with_html_extraction(self.filter_by_today, self.extract_html)
             else:
                 session = self.crawler_service.crawl_all_categories(self.filter_by_today)
             
             if session.total_articles > 0:
-                logger.info(f"✅ Scheduled crawl completed. New articles: {session.total_articles}")
+                logger.info(f"Scheduled crawl completed. New articles: {session.total_articles}")
             else:
-                logger.info("ℹ️ Scheduled crawl completed. No new articles found")
+                logger.info("Scheduled crawl completed. No new articles found")
                 
         except Exception as e:
-            logger.error(f"❌ Scheduled crawl failed: {e}")
+            logger.error(f"Scheduled crawl failed: {e}")
     
     def update_interval(self, new_interval_minutes: int):
         """Update the crawl interval"""
@@ -177,4 +177,4 @@ class CrawlerScheduler:
                 'vietstock_crawler',
                 trigger=IntervalTrigger(minutes=self.interval_minutes)
             )
-            logger.info(f"⏰ Updated crawl interval to {self.interval_minutes} minutes")
+            logger.info(f"Updated crawl interval to {self.interval_minutes} minutes")
