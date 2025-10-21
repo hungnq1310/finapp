@@ -5,11 +5,21 @@ This module provides MongoDB-specific implementations of the data repository.
 """
 
 import logging
+import os
 from typing import Dict, Any, Optional, List
+from pymongo import MongoClient
+from dotenv import load_dotenv
 from .abstract import DataRepository
 from ..schema.base import (
     RawDocument, NewsArticle, StockReport, SectorReport, MarketReport
 )
+
+load_dotenv()
+
+def get_mongo_client():
+    """Get MongoDB client connection"""
+    mongo_uri = os.getenv('MONGODB_URL', 'mongodb://localhost:27017')
+    return MongoClient(mongo_uri)
 
 
 class MongoDataRepository(DataRepository):

@@ -43,13 +43,13 @@ class VietstockRepository(DataRepository):
             
             # Test connection
             self.client.admin.command('ping')
-            logger.info(f"✅ Connected to MongoDB at {self.mongo_uri}")
+            logger.info(f"Connected to MongoDB at {self.mongo_uri}")
             
             # Create indexes for better performance
             self._create_indexes()
             
         except Exception as e:
-            logger.error(f"❌ Failed to connect to MongoDB: {e}")
+            logger.error(f"Failed to connect to MongoDB: {e}")
             raise
     
     def _create_indexes(self):
@@ -82,15 +82,30 @@ class VietstockRepository(DataRepository):
             # Crawl sessions collection indexes
             sessions_collection = self.db.vietstock_crawl_sessions
             sessions_collection.create_index([("created_at", -1)], name="idx_sessions_created")
-            sessions_collection.create_index("success", name="idx_sessions_success")
             
-            logger.info("✅ MongoDB indexes created successfully")
+            # Try to create success index with fallback handling
+            try:
+                sessions_collection.create_index("success", name="idx_sessions_success")
+            except Exception as e:
+                if "Index already exists" in str(e):
+                    logger.info("Success index already exists, checking if it's properly configured")
+                    # Drop old auto-generated index if it exists and create new one
+                    try:
+                        sessions_collection.drop_index("success_1")
+                        sessions_collection.create_index("success", name="idx_sessions_success")
+                        logger.info("Successfully replaced auto-generated success index")
+                    except Exception:
+                        logger.info("Using existing success index (may be auto-generated)")
+                else:
+                    logger.warning(f"Could not create success index: {e}")
+            
+            logger.info("MongoDB indexes created successfully")
             logger.info("   - Unique index on RSS GUID for duplicate prevention")
             logger.info("   - Performance indexes for common queries")
             logger.info("   - Text search indexes for content")
             
         except Exception as e:
-            logger.warning(f"⚠️ Could not create indexes: {e}")
+            logger.warning(f"Could not create indexes: {e}")
     
     def save_article(self, article: VietstockArticle) -> bool:
         """
@@ -114,17 +129,17 @@ class VietstockRepository(DataRepository):
             )
             
             if result.upserted_id:
-                logger.info(f"✅ Created new article: {article.id}")
+                logger.info(f"Created new article: {article.id}")
             else:
-                logger.debug(f"🔄 Updated existing article: {article.id}")
-            
+                logger.debug(f"Updated existing article: {article.id}")
+
             return True
             
         except DuplicateKeyError:
-            logger.debug(f"⚠️ Article already exists: {article.get_rss_guid()}")
+            logger.debug(f"Article already exists: {article.get_rss_guid()}")
             return False
         except Exception as e:
-            logger.error(f"❌ Error saving article {article.id}: {e}")
+            logger.error(f"Error saving article {article.id}: {e}")
             return False
     
     def save_articles_batch(self, articles: List[VietstockArticle]) -> Dict[str, int]:
@@ -162,14 +177,14 @@ class VietstockRepository(DataRepository):
                         results["duplicates"] += 1
                         
                 except Exception as e:
-                    logger.debug(f"⚠️ Failed to save article {article.id}: {e}")
+                    logger.debug(f"Failed to save article {article.id}: {e}")
                     results["failed"] += 1
             
-            logger.info(f"📊 Batch save results: {results}")
+            logger.info(f"Batch save results: {results}")
             return results
             
         except Exception as e:
-            logger.error(f"❌ Error in batch save: {e}")
+            logger.error(f"Error in batch save: {e}")
             results["failed"] = len(articles)
             return results
     
@@ -192,7 +207,7 @@ class VietstockRepository(DataRepository):
             return None
             
         except Exception as e:
-            logger.error(f"❌ Error finding article by GUID {guid}: {e}")
+            logger.error(f"Error finding article by GUID {guid}: {e}")
             return None
     
     def find_articles_by_category(self, category: str, limit: int = 100) -> List[VietstockArticle]:
@@ -215,7 +230,7 @@ class VietstockRepository(DataRepository):
             return [self._dict_to_vietstock_article(doc) for doc in docs]
             
         except Exception as e:
-            logger.error(f"❌ Error finding articles by category {category}: {e}")
+            logger.error(f"Error finding articles by category {category}: {e}")
             return []
     
     def find_articles_by_date_range(self, start_date: datetime, end_date: datetime, 
@@ -247,7 +262,7 @@ class VietstockRepository(DataRepository):
             return [self._dict_to_vietstock_article(doc) for doc in docs]
             
         except Exception as e:
-            logger.error(f"❌ Error finding articles by date range: {e}")
+            logger.error(f"Error finding articles by date range: {e}")
             return []
     
     def get_articles_statistics(self) -> Dict[str, Any]:
@@ -321,7 +336,7 @@ class VietstockRepository(DataRepository):
             }
             
         except Exception as e:
-            logger.error(f"❌ Error getting statistics: {e}")
+            logger.error(f"Error getting statistics: {e}")
             return {"error": str(e)}
     
     def save_crawl_session(self, session: VietstockCrawlSession) -> bool:
@@ -339,11 +354,11 @@ class VietstockRepository(DataRepository):
             session_dict = session.to_dict()
             
             result = collection.insert_one(session_dict)
-            logger.info(f"✅ Saved crawl session: {session.id}")
+            logger.info(f"Saved crawl session: {session.id}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error saving crawl session {session.id}: {e}")
+            logger.error(f"Error saving crawl session {session.id}: {e}")
             return False
     
     def get_recent_crawl_sessions(self, limit: int = 10) -> List[VietstockCrawlSession]:
@@ -363,7 +378,7 @@ class VietstockRepository(DataRepository):
             return [self._dict_to_crawl_session(doc) for doc in docs]
             
         except Exception as e:
-            logger.error(f"❌ Error getting recent crawl sessions: {e}")
+            logger.error(f"Error getting recent crawl sessions: {e}")
             return []
     
     def _dict_to_vietstock_article(self, doc: Dict) -> VietstockArticle:
@@ -401,7 +416,7 @@ class VietstockRepository(DataRepository):
                 docs = list(collection.find(criteria))
                 return [self._dict_to_vietstock_article(doc) for doc in docs]
             except Exception as e:
-                logger.error(f"❌ Error finding articles by criteria: {e}")
+                logger.error(f"Error finding articles by criteria: {e}")
                 return []
         return []
     
@@ -413,7 +428,7 @@ class VietstockRepository(DataRepository):
                 result = collection.update_one({"_id": doc_id}, {"$set": updates})
                 return result.modified_count > 0
         except Exception as e:
-            logger.error(f"❌ Error updating document {doc_id}: {e}")
+            logger.error(f"Error updating document {doc_id}: {e}")
         return False
     
     def delete(self, doc_id: str, doc_type: type) -> bool:
@@ -424,11 +439,11 @@ class VietstockRepository(DataRepository):
                 result = collection.delete_one({"_id": doc_id})
                 return result.deleted_count > 0
         except Exception as e:
-            logger.error(f"❌ Error deleting document {doc_id}: {e}")
+            logger.error(f"Error deleting document {doc_id}: {e}")
         return False
     
     def close(self):
         """Close MongoDB connection"""
         if self.client:
             self.client.close()
-            logger.info("🔌 MongoDB connection closed")
+            logger.info("MongoDB connection closed")
