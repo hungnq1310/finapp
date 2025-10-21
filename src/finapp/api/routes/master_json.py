@@ -140,12 +140,16 @@ async def process_daily_to_master(
                 try:
                     from pathlib import Path
                     import json
+                    from ...config import Config
                     
                     # Find the JSON file for the date
-                    json_file = Path(f"data/vietstock/{request.target_date.replace('-', '')}/articles_{request.target_date.replace('-', '')}.json")
+                    config = Config()
+                    vietstock_config = config.CRAWLER_SOURCE_CONFIGS.get('vietstock', {})
+                    vietstock_output_dir = vietstock_config.get('output_dir', 'data/vietstock')
+                    json_file = Path(f"{vietstock_output_dir}/{request.target_date.replace('-', '')}/articles_{request.target_date.replace('-', '')}.json")
                     
                     if not json_file.exists():
-                        logger.error(f"❌ No articles file found for {request.target_date}")
+                        logger.error(f"No articles file found for {request.target_date}")
                         return
                     
                     # Load articles
@@ -154,7 +158,7 @@ async def process_daily_to_master(
                     
                     articles = data.get("articles", [])
                     if not articles:
-                        logger.warning(f"⚠️ No articles found for {request.target_date}")
+                        logger.warning(f"No articles found for {request.target_date}")
                         return
                     
                     # Extract and organize
@@ -187,7 +191,7 @@ async def process_daily_to_master(
                             
                             if master_result["success"]:
                                 successful_extractions += 1
-                                logger.info(f"✅ Processed article {successful_extractions}/{len(articles)}: {article.get('title', '')[:50]}...")
+                                logger.info(f"Processed article {successful_extractions}/{len(articles)}: {article.get('title', '')[:50]}...")
                             
                             # Rate limiting
                             if request.delay_seconds and request.delay_seconds > 0:
@@ -195,13 +199,13 @@ async def process_daily_to_master(
                                 time.sleep(request.delay_seconds)
                                 
                         except Exception as e:
-                            logger.error(f"❌ Failed to process article {article.get('guid', 'unknown')}: {e}")
+                            logger.error(f"Failed to process article {article.get('guid', 'unknown')}: {e}")
                             continue
                     
-                    logger.info(f"🎉 Daily processing completed for {request.target_date}: {successful_extractions}/{len(articles)} successful")
+                    logger.info(f"Daily processing completed for {request.target_date}: {successful_extractions}/{len(articles)} successful")
                     
                 except Exception as e:
-                    logger.error(f"❌ Background processing failed for {request.target_date}: {e}")
+                    logger.error(f"Background processing failed for {request.target_date}: {e}")
             
             background_tasks.add_task(process_and_organize)
             
@@ -217,9 +221,14 @@ async def process_daily_to_master(
             )
         else:
             # Run immediately without organization
+            from ...config import Config
+            config = Config()
+            vietstock_config = config.CRAWLER_SOURCE_CONFIGS.get('vietstock', {})
+            vietstock_output_dir = vietstock_config.get('output_dir', 'data/vietstock')
+            
             service = get_extraction_service()
             result = service.process_articles_from_json(
-                json_file_path=f"data/vietstock/{request.target_date.replace('-', '')}/articles_{request.target_date.replace('-', '')}.json",
+                json_file_path=f"{vietstock_output_dir}/{request.target_date.replace('-', '')}/articles_{request.target_date.replace('-', '')}.json",
                 session_name=request.session_name or f"daily-{request.target_date}"
             )
             return result
@@ -227,7 +236,7 @@ async def process_daily_to_master(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Daily processing failed: {e}")
+        logger.error(f"Daily processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"Daily processing failed: {e}")
 
 
@@ -272,7 +281,7 @@ async def get_daily_summary(target_date: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get daily summary for {target_date}: {e}")
+        logger.error(f"Failed to get daily summary for {target_date}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get daily summary")
 
 
@@ -321,7 +330,7 @@ async def query_master_data(target_date: str, request: MasterQueryRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to query master data for {target_date}: {e}")
+        logger.error(f"Failed to query master data for {target_date}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to query master data")
 
 
@@ -360,7 +369,7 @@ async def get_stock_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get stock analysis for {ticker}: {e}")
+        logger.error(f"Failed to get stock analysis for {ticker}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get stock analysis")
 
 
@@ -403,7 +412,7 @@ async def get_sector_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get sector analysis for {sector_name}: {e}")
+        logger.error(f"Failed to get sector analysis for {sector_name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get sector analysis")
 
 
@@ -425,7 +434,7 @@ async def get_available_dates():
         return result
         
     except Exception as e:
-        logger.error(f"❌ Failed to get available dates: {e}")
+        logger.error(f"Failed to get available dates: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get available dates")
 
 
@@ -464,7 +473,7 @@ async def export_report_data(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to export report data for {target_date}: {e}")
+        logger.error(f"Failed to export report data for {target_date}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to export report data")
 
 
@@ -572,7 +581,7 @@ async def search_master_data(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to search master data for {target_date}: {e}")
+        logger.error(f"Failed to search master data for {target_date}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to search master data")
 
 
@@ -636,7 +645,7 @@ async def get_market_insights(target_date: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get market insights for {target_date}: {e}")
+        logger.error(f"Failed to get market insights for {target_date}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get market insights")
 
 

@@ -18,6 +18,9 @@ from ...services.extract.extraction_service import ExtractionService
 from ...services.extract.extrator_agent import LLMExtractorAgent
 from ...schema.request import LLMExtractorResponse
 from ...config import Config
+from .auto_processor import AutoProcessor
+from ...services.crawl.storage import StorageService
+from ...config.dataclasses import StorageConfig, SourceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +102,7 @@ async def extract_single_article(request: ExtractionRequest):
     try:
         extractor = get_extractor_agent()
         
-        logger.info(f"🔄 Extracting data for article: {request.article_guid}")
+        logger.info(f"Extracting data for article: {request.article_guid}")
         
         # Extract article data
         result = extractor.extract_single_article(
@@ -110,7 +113,7 @@ async def extract_single_article(request: ExtractionRequest):
             article_guid=request.article_guid
         )
         
-        logger.info(f"✅ Extraction completed for {request.article_guid}")
+        logger.info(f"Extraction completed for {request.article_guid}")
         
         return LLMExtractorResponse(
             success=True,
@@ -123,7 +126,7 @@ async def extract_single_article(request: ExtractionRequest):
         )
         
     except Exception as e:
-        logger.error(f"❌ Single article extraction failed: {e}")
+        logger.error(f"Single article extraction failed: {e}")
         raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
 
 
@@ -147,7 +150,7 @@ async def extract_batch_articles(request: BatchExtractionRequest):
             total_articles=len(request.articles)
         )
         
-        logger.info(f"🚀 Starting batch extraction for {len(request.articles)} articles")
+        logger.info(f"Starting batch extraction for {len(request.articles)} articles")
         
         # Convert articles to dict format
         articles = [
@@ -181,7 +184,7 @@ async def extract_batch_articles(request: BatchExtractionRequest):
             session.completed_batches = 1
             service._save_session(session)
         
-        logger.info(f"🎉 Batch extraction completed: {batch_result.successful_extractions}/{batch_result.total_articles} successful")
+        logger.info(f"Batch extraction completed: {batch_result.successful_extractions}/{batch_result.total_articles} successful")
         
         return LLMExtractorResponse(
             success=True,
@@ -199,7 +202,7 @@ async def extract_batch_articles(request: BatchExtractionRequest):
         )
         
     except Exception as e:
-        logger.error(f"❌ Batch extraction failed: {e}")
+        logger.error(f"Batch extraction failed: {e}")
         raise HTTPException(status_code=500, detail=f"Batch extraction failed: {e}")
 
 
@@ -231,7 +234,7 @@ async def process_json_file(
         if not json_file.suffix.lower() == '.json':
             raise HTTPException(status_code=400, detail="File must be a JSON file")
         
-        logger.info(f"🚀 Processing articles from file: {file_path}")
+        logger.info(f"Processing articles from file: {file_path}")
         
         # Process file
         result = service.process_articles_from_json(
@@ -244,7 +247,7 @@ async def process_json_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ File processing failed: {e}")
+        logger.error(f"File processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"File processing failed: {e}")
 
 
@@ -282,7 +285,7 @@ async def upload_and_process_file(
             content = await file.read()
             buffer.write(content)
         
-        logger.info(f"📁 File uploaded: {file_path}")
+        logger.info(f"File uploaded: {file_path}")
         
         # Process file in background
         service = get_extraction_service()
@@ -293,9 +296,9 @@ async def upload_and_process_file(
                     json_file_path=str(file_path),
                     session_name=session_name or f"upload_{file.filename}"
                 )
-                logger.info(f"✅ Background processing completed for {file.filename}")
+                logger.info(f"Background processing completed for {file.filename}")
             except Exception as e:
-                logger.error(f"❌ Background processing failed for {file.filename}: {e}")
+                logger.error(f"Background processing failed for {file.filename}: {e}")
         
         background_tasks.add_task(process_background)
         
@@ -312,7 +315,7 @@ async def upload_and_process_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ File upload failed: {e}")
+        logger.error(f"File upload failed: {e}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {e}")
 
 
@@ -335,7 +338,7 @@ async def list_extraction_sessions():
         )
         
     except Exception as e:
-        logger.error(f"❌ Failed to list sessions: {e}")
+        logger.error(f"Failed to list sessions: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list sessions: {e}")
 
 
@@ -366,7 +369,7 @@ async def get_session_status(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get session status: {e}")
+        logger.error(f"Failed to get session status: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get session status: {e}")
 
 
@@ -397,7 +400,7 @@ async def get_extraction_results(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get extraction results: {e}")
+        logger.error(f"Failed to get extraction results: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get extraction results: {e}")
 
 
@@ -417,7 +420,7 @@ async def get_model_info():
         return ModelInfoResponse(**model_info)
         
     except Exception as e:
-        logger.error(f"❌ Failed to get model info: {e}")
+        logger.error(f"Failed to get model info: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {e}")
 
 
@@ -442,7 +445,6 @@ async def auto_process_date(
         LLMExtractorResponse with processing results
     """
     try:
-        from datetime import datetime
         
         # Determine target date
         if target_date:
@@ -455,21 +457,35 @@ async def auto_process_date(
             target_date = target_date_obj.strftime("%Y%m%d")
         
         # Find JSON file for the date
-        json_file = Path(f"data/vietstock/{target_date}/articles_{target_date}.json")
+        config = Config()
+        vietstock_config = config.CRAWLER_SOURCE_CONFIGS.get('vietstock', {})
+        vietstock_output_dir = vietstock_config.get('output_dir', 'data/vietstock')
+        json_file = Path(f"{vietstock_output_dir}/{target_date}/articles_{target_date}.json")
         
         if not json_file.exists():
             # Try to restore from MongoDB if file doesn't exist
-            from ...services.crawl.storage import StorageService
-            storage_service = StorageService()
+            
+            storage_config = StorageConfig(
+                storage_type="mongodb",
+                base_dir=config.CRAWLER_OUTPUT_DIR,
+                database_name=config.DATABASE_NAME
+            )
+            source_config = SourceConfig(
+                name="vietstock",
+                base_url=vietstock_config.get('base_url', 'https://vietstock.vn/rss'),
+                base_domain=vietstock_config.get('base_domain', 'https://vietstock.vn'),
+                output_dir=vietstock_output_dir
+            )
+            storage_service = StorageService(storage_config, source_config)
             restored = storage_service.restore_from_mongodb(target_date)
             
             if restored:
-                json_file = Path(f"data/vietstock/{target_date}/articles_{target_date}.json")
+                json_file = Path(f"{vietstock_output_dir}/{target_date}/articles_{target_date}.json")
             else:
                 raise HTTPException(status_code=404, detail=f"No articles found for date {target_date}")
         
-        logger.info(f"🚀 Auto-processing articles for date: {target_date}")
-        logger.info(f"📁 JSON file: {json_file}")
+        logger.info(f"Auto-processing articles for date: {target_date}")
+        logger.info(f"JSON file: {json_file}")
         
         if auto_mode:
             # Run in background with enhanced logging
@@ -481,16 +497,19 @@ async def auto_process_date(
             
             def process_with_logging():
                 try:
-                    from .auto_processor import AutoProcessor
                     processor = AutoProcessor()
                     result = processor.process_date_with_logging(
                         target_date=target_date,
                         session_id=session_id,
                         delay_seconds=delay_seconds or Config.EXTRACTOR_DELAY_SECONDS
                     )
-                    logger.info(f"✅ Auto-processing completed for {target_date}: {result.success}")
+                    # result is a dict, not an object with attributes
+                    success_status = result.get('success', False) if isinstance(result, dict) else result.success
+                    logger.info(f"Auto-processing completed for {target_date}: success={success_status}")
                 except Exception as e:
-                    logger.error(f"❌ Auto-processing failed for {target_date}: {e}")
+                    logger.error(f"Auto-processing failed for {target_date}: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
                     # Update session with error
                     if session_id in service.active_sessions:
                         service.active_sessions[session_id].status = "failed"
@@ -523,7 +542,7 @@ async def auto_process_date(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Auto-processing failed: {e}")
+        logger.error(f"Auto-processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"Auto-processing failed: {e}")
 
 
@@ -559,7 +578,7 @@ async def get_extractor_config():
         }
         
     except Exception as e:
-        logger.error(f"❌ Failed to get extractor config: {e}")
+        logger.error(f"Failed to get extractor config: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get extractor config: {e}")
 
 
@@ -627,7 +646,7 @@ async def get_extraction_logs(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get extraction logs: {e}")
+        logger.error(f"Failed to get extraction logs: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get extraction logs: {e}")
 
 
@@ -640,10 +659,19 @@ async def get_available_dates():
         List of available dates with article counts
     """
     try:
-        from ...services.crawl.storage import StorageService
-        from datetime import datetime, date, timedelta
-        
-        storage = StorageService()
+
+        storage_config = StorageConfig(
+            storage_type="mongodb",
+            base_dir="data",
+            database_name="financial_news"
+        )
+        source_config = SourceConfig(
+            name="vietstock",
+            base_url="https://vietstock.vn",
+            base_domain="vietstock.vn",
+            output_dir="vietstock"
+        )
+        storage = StorageService(storage_config, source_config)
         available_dates = []
         
         # Check last 30 days
@@ -688,7 +716,7 @@ async def get_available_dates():
         }
         
     except Exception as e:
-        logger.error(f"❌ Failed to get available dates: {e}")
+        logger.error(f"Failed to get available dates: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get available dates: {e}")
 
 
