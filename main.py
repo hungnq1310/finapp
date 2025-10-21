@@ -94,6 +94,7 @@ app.include_router(extractor_router)
 app.include_router(master_json_router)
 app.include_router(system_config_router)
 app.include_router(llm_results_router)
+# app.include_router(financial_reports_router)  # Temporarily disabled
 
 # Health check endpoint
 @app.get("/health")
@@ -155,6 +156,12 @@ async def root():
             "switch_llm": "/system/llm/switch",
             "services_status": "/system/services/status",
             "export_config": "/system/config/export"
+        },
+        "financial_reports_endpoints": {
+            "available_entities": "/financial/available-entities",
+            "gather_articles": "/financial/gather-articles",
+            "generate_report": "/financial/generate-report",
+            "health": "/financial/health"
         }
     }
 
@@ -163,7 +170,6 @@ def main():
     """Main entry point"""
     port = Config.API_PORT
     host = Config.API_HOST
-    reload = Config.API_RELOAD
 
     logger.info(f"Starting server on {host}:{port}")
 
@@ -172,7 +178,7 @@ def main():
         host=host,
         port=port,
         log_level=getattr(logging, Config.LOG_LEVEL),
-        reload=reload
+        reload=True
     )
 
 if __name__ == "__main__":
