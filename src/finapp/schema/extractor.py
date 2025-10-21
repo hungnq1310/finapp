@@ -18,7 +18,7 @@ class SentimentAnalysis(BaseModel):
 
 class StockLevel(BaseModel):
     """Stock-level analysis"""
-    ticker: str = Field(..., pattern=r"^[A-Z]{2,4}$", description="Stock ticker symbol")
+    ticker: str = Field(..., pattern=r"^[A-Z0-9]{2,10}$", description="Stock ticker symbol (2-10 chars, alphanumeric)")
     company_name: Optional[str] = Field(None, description="Company name")
     sentiment: str = Field(..., description="Stock sentiment: tích cực/tiêu cực/trung lập")
     impact_type: str = Field(..., description="Type of impact: tài chính/hoạt động kinh doanh/thị trường/quản trị/pháp lý/khác")
