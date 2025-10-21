@@ -49,16 +49,16 @@ class SourceConfig:
 @dataclass
 class StorageConfig:
     """Configuration for storage backend"""
-    storage_type: str = "hybrid"  # json, mongodb, hybrid
+    storage_type: str = field(default_factory=lambda: os.getenv("STORAGE_TYPE", "hybrid"))
     
     # JSON storage settings
-    base_dir: str = "data"
+    base_dir: str = field(default_factory=lambda: os.getenv("STORAGE_BASE_DIR", "data"))
     file_format: str = "json"
-    compression: bool = False
+    compression: bool = field(default_factory=lambda: os.getenv("STORAGE_COMPRESSION", "false").lower() == "true")
     
     # MongoDB settings
-    mongodb_uri: str = "mongodb://localhost:27017"
-    database_name: str = "financial_news"
+    mongodb_uri: str = field(default_factory=lambda: os.getenv("MONGODB_URI", ""))
+    database_name: str = field(default_factory=lambda: os.getenv("DATABASE_NAME", ""))
     
     # Hybrid settings
     use_mongodb_primary: bool = False
@@ -104,7 +104,7 @@ class LLMConfig:
 @dataclass
 class MasterJSONConfig:
     """Configuration for master JSON service"""
-    base_dir: str = "data/master"
+    base_dir: str = field(default_factory=lambda: os.getenv("MASTER_JSON_DIR", "data/master"))
     organization_type: str = "date_hierarchy"  # date_hierarchy, flat
     
     # File settings
@@ -225,12 +225,14 @@ class SystemConfig:
 
 
 # Predefined source configurations
+# All URLs and paths now use environment variables
+
 VIETSTOCK_CONFIG = SourceConfig(
     name="vietstock",
-    base_url="https://vietstock.vn/rss",
-    base_domain="https://vietstock.vn",
-    rss_url="https://vietstock.vn/rss",
-    output_dir="data/vietstock",
+    base_url=os.getenv("VIETSTOCK_BASE_URL", "https://vietstock.vn/rss"),
+    base_domain=os.getenv("VIETSTOCK_BASE_DOMAIN", "https://vietstock.vn"),
+    rss_url=os.getenv("VIETSTOCK_RSS_URL", "https://vietstock.vn/rss"),
+    output_dir=os.getenv("VIETSTOCK_OUTPUT_DIR", "data/vietstock"),
     custom_settings={
         "vietnamese_content": True,
         "financial_focus": True
@@ -239,10 +241,10 @@ VIETSTOCK_CONFIG = SourceConfig(
 
 CAFEF_CONFIG = SourceConfig(
     name="cafef",
-    base_url="https://cafef.vn/rss",
-    base_domain="https://cafef.vn",
-    rss_url="https://cafef.vn/rss",
-    output_dir="data/cafef",
+    base_url=os.getenv("CAFEF_BASE_URL", "https://cafef.vn/rss"),
+    base_domain=os.getenv("CAFEF_BASE_DOMAIN", "https://cafef.vn"),
+    rss_url=os.getenv("CAFEF_RSS_URL", "https://cafef.vn/rss"),
+    output_dir=os.getenv("CAFEF_OUTPUT_DIR", "data/cafef"),
     title_selector="title",
     link_selector="link",
     description_selector="description",
@@ -256,10 +258,10 @@ CAFEF_CONFIG = SourceConfig(
 
 VIETNAMFINANCE_CONFIG = SourceConfig(
     name="vietnamfinance",
-    base_url="https://vietnamfinance.vn/rss",
-    base_domain="https://vietnamfinance.vn",
-    rss_url="https://vietnamfinance.vn/rss",
-    output_dir="data/vietnamfinance",
+    base_url=os.getenv("VIETNAMFINANCE_BASE_URL", "https://vietnamfinance.vn/rss"),
+    base_domain=os.getenv("VIETNAMFINANCE_BASE_DOMAIN", "https://vietnamfinance.vn"),
+    rss_url=os.getenv("VIETNAMFINANCE_RSS_URL", "https://vietnamfinance.vn/rss"),
+    output_dir=os.getenv("VIETNAMFINANCE_OUTPUT_DIR", "data/vietnamfinance"),
     custom_settings={
         "vietnamese_content": True,
         "financial_focus": True,
@@ -267,12 +269,12 @@ VIETNAMFINANCE_CONFIG = SourceConfig(
     }
 )
 
-TUoitre_CONFIG = SourceConfig(
+TUOITRE_CONFIG = SourceConfig(
     name="tuoitre",
-    base_url="https://tuoitre.vn/rss",
-    base_domain="https://tuoitre.vn",
-    rss_url="https://tuoitre.vn/rss/tai-chinh-kinh-doanh.rss",
-    output_dir="data/tuoitre",
+    base_url=os.getenv("TUOITRE_BASE_URL", "https://tuoitre.vn/rss"),
+    base_domain=os.getenv("TUOITRE_BASE_DOMAIN", "https://tuoitre.vn"),
+    rss_url=os.getenv("TUOITRE_RSS_URL", "https://tuoitre.vn/rss/tai-chinh-kinh-doanh.rss"),
+    output_dir=os.getenv("TUOITRE_OUTPUT_DIR", "data/tuoitre"),
     source_type="rss",
     custom_settings={
         "vietnamese_content": True,
@@ -283,10 +285,10 @@ TUoitre_CONFIG = SourceConfig(
 
 VNEXPRESS_CONFIG = SourceConfig(
     name="vnexpress",
-    base_url="https://vnexpress.net/rss",
-    base_domain="https://vnexpress.net",
-    rss_url="https://vnexpress.net/rss/kinh-doanh.rss",
-    output_dir="data/vnexpress",
+    base_url=os.getenv("VNEXPRESS_BASE_URL", "https://vnexpress.net/rss"),
+    base_domain=os.getenv("VNEXPRESS_BASE_DOMAIN", "https://vnexpress.net"),
+    rss_url=os.getenv("VNEXPRESS_RSS_URL", "https://vnexpress.net/rss/kinh-doanh.rss"),
+    output_dir=os.getenv("VNEXPRESS_OUTPUT_DIR", "data/vnexpress"),
     source_type="rss",
     custom_settings={
         "vietnamese_content": True,
@@ -296,31 +298,33 @@ VNEXPRESS_CONFIG = SourceConfig(
 )
 
 # Predefined LLM configurations
+# ⚠️ API keys MUST be set in .env file, not hardcoded here!
+
 OPENROUTER_CLAUDE_CONFIG = LLMConfig(
     provider="openrouter",
-    api_key="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",
-    base_url="https://openrouter.ai/api/v1",
-    model_name="anthropic/claude-3.5-sonnet",
-    temperature=0.65,
-    max_tokens=4096
+    api_key=os.getenv("OPENROUTER_API_KEY", ""),
+    base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    model_name=os.getenv("LLM_MODEL_NAME", "anthropic/claude-3.5-sonnet"),
+    temperature=float(os.getenv("LLM_TEMPERATURE", "0.65")),
+    max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096"))
 )
 
 OPENAI_GPT4_CONFIG = LLMConfig(
     provider="openai",
-    api_key="",
-    base_url="https://api.openai.com/v1",
-    model_name="gpt-4",
-    temperature=0.65,
-    max_tokens=4096
+    api_key=os.getenv("OPENAI_API_KEY", ""),
+    base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+    model_name=os.getenv("OPENAI_MODEL_NAME", "gpt-4"),
+    temperature=float(os.getenv("LLM_TEMPERATURE", "0.65")),
+    max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096"))
 )
 
 CUSTOM_LLM_CONFIG = LLMConfig(
-    provider="custom",
-    api_key="sk-RdTlN8Jxq0b5hmRloOpZ3qOdU7nlWhxp7upQNYnwh9GJJL1V",
-    base_url="https://api2.key4u.shop/v1",
-    model_name="gpt-4.1-nano-2025-04-14",
-    temperature=0.65,
-    max_tokens=4096
+    provider=os.getenv("CUSTOM_LLM_PROVIDER", "custom"),
+    api_key=os.getenv("CUSTOM_LLM_API_KEY", ""),
+    base_url=os.getenv("CUSTOM_LLM_BASE_URL", "https://api2.key4u.shop/v1"),
+    model_name=os.getenv("CUSTOM_LLM_MODEL_NAME", "gpt-4.1-nano-2025-04-14"),
+    temperature=float(os.getenv("LLM_TEMPERATURE", "0.65")),
+    max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096"))
 )
 
 
@@ -362,7 +366,7 @@ def create_default_config() -> SystemConfig:
 
 def create_multi_source_config() -> SystemConfig:
     """Create configuration with multiple sources"""
-    sources = [VIETSTOCK_CONFIG, CAFEF_CONFIG, VIETNAMFINANCE_CONFIG, TUoitre_CONFIG]
+    sources = [VIETSTOCK_CONFIG, CAFEF_CONFIG, VIETNAMFINANCE_CONFIG, TUOITRE_CONFIG]
     
     crawler_config = CrawlerConfig(
         sources=sources,
@@ -414,7 +418,7 @@ def get_source_config_by_name(source_name: str) -> SourceConfig:
         "vietstock": VIETSTOCK_CONFIG,
         "cafef": CAFEF_CONFIG,
         "vietnamfinance": VIETNAMFINANCE_CONFIG,
-        "tuoitre": TUoitre_CONFIG,
+        "tuoitre": TUOITRE_CONFIG,
         "vnexpress": VNEXPRESS_CONFIG
     }
     
