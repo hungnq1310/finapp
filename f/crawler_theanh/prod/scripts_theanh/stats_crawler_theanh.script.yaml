@@ -1,0 +1,13 @@
+summary: stats_crawler_theanh
+description: ''
+lock: '!inline f/scripts_theanh/stats_crawler_theanh.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  properties:
+    timeframe_days:
+      type: integer
+      description: ''
+      default: 1
+  required: []

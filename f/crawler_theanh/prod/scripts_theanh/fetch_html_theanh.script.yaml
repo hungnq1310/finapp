@@ -1,0 +1,15 @@
+summary: fetch_html_theanh
+description: ''
+lock: '!inline f/scripts_theanh/fetch_html_theanh.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  properties:
+    article:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+  required:
+    - article

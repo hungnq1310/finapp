@@ -1,0 +1,68 @@
+summary: news_crawler_flow_theanh
+description: ''
+value:
+  modules:
+    - id: check_rss_feeds
+      summary: Check RSS feeds for new articles
+      value:
+        type: script
+        input_transforms:
+          feeds:
+            type: static
+        is_trigger: false
+        path: f/scripts_theanh/crawler_theanh
+      continue_on_error: false
+    - id: loop
+      summary: For loop
+      value:
+        type: forloopflow
+        modules:
+          - id: fetch_html
+            summary: Fetch full HTML content
+            value:
+              type: script
+              input_transforms:
+                article:
+                  type: javascript
+                  expr: flow_input.iter.value
+              is_trigger: false
+              path: f/scripts_theanh/fetch_html_theanh
+          - id: extract_with_llm
+            summary: Extract structured data using LLM
+            value:
+              type: script
+              input_transforms:
+                document_id:
+                  type: javascript
+                  value: ''
+                  expr: results.fetch_html.document_id
+                max_retries:
+                  type: static
+                  value: 3
+              is_trigger: false
+              path: f/scripts_theanh/llm_extract_news_theanh
+        iterator:
+          type: javascript
+          expr: results.check_rss_feeds.new_articles
+        parallel: false
+        skip_failures: true
+      mock:
+        enabled: false
+        return_value:
+          example: value
+    - id: stats
+      summary: stats_crawl
+      value:
+        type: script
+        input_transforms:
+          timeframe_days:
+            type: static
+            value: 1
+        is_trigger: false
+        path: f/scripts_theanh/stats_crawler_theanh
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  order: []
+  properties: {}
+  required: []
