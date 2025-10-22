@@ -65,22 +65,6 @@ services:
       - finapp-network
     restart: unless-stopped
 
-  # Windmill workflow engine
-  windmill:
-    image: ghcr.io/windmill-labs/windmill:main
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgres://windmill:password@postgres:5432/windmill
-      - BASE_URL=http://localhost:8000
-    depends_on:
-      - postgres
-    volumes:
-      - windmill_data:/tmp/windmill
-    networks:
-      - finapp-network
-    restart: unless-stopped
-
 networks:
   finapp-network:
     driver: bridge
@@ -89,5 +73,3 @@ volumes:
   mongo_data:
   postgres_data:
   minio_data:
-  windmill_data:
-  windmill_data:

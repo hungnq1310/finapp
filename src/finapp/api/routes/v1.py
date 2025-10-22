@@ -237,7 +237,7 @@ async def list_index_reports(
         raise HTTPException(status_code=500, detail="Failed to retrieve index reports")
 
 
-@router.get("/reports/indices/latest", response_model=IndexReport, tags=["index-reports"])
+@router.get("/reports/indices/latest", tags=["index-reports"])
 async def get_latest_index_report(
     minio_service: MinioService = Depends(get_minio_service)
 ):
@@ -257,7 +257,7 @@ async def get_latest_index_report(
         raise HTTPException(status_code=500, detail="Failed to retrieve latest index report")
 
 
-@router.get("/reports/indices/{filename}", response_model=IndexReport, tags=["index-reports"])
+@router.get("/reports/indices/{filename}", tags=["index-reports"])
 async def get_index_report_by_filename(
     filename: str,
     minio_service: MinioService = Depends(get_minio_service)
@@ -278,7 +278,7 @@ async def get_index_report_by_filename(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve stock report '{filename}'")
 
 
-@router.get("/reports/indices/date/{date}", response_model=IndexReport, tags=["index-reports"])
+@router.get("/reports/indices/date/{date}", tags=["index-reports"])
 async def get_index_report_by_date(
     date: str,
     minio_service: MinioService = Depends(get_minio_service)

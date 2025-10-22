@@ -1,0 +1,13 @@
+summary: check_rss_feeds_theanh
+description: ''
+lock: '!inline f/scripts_theanh/crawler_theanh.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  properties:
+    feeds:
+      type: object
+      description: ''
+      default: null
+  required: []

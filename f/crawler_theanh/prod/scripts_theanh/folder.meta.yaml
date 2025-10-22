@@ -1,0 +1,6 @@
+summary: scripts_theanh
+display_name: scripts_theanh
+extra_perms:
+  u/oudev2: true
+owners:
+  - u/oudev2
