@@ -1,0 +1,19 @@
+summary: ''
+description: ''
+lock: '!inline f/scripts_chiton/llm_extract_news.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  properties:
+    document_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    max_retries:
+      type: integer
+      description: ''
+      default: 3
+  required:
+    - document_id

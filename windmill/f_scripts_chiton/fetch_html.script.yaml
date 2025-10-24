@@ -1,0 +1,15 @@
+summary: ''
+description: ''
+lock: '!inline f/scripts_chiton/fetch_html.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  properties:
+    article:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+  required:
+    - article
